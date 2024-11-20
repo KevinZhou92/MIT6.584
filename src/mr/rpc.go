@@ -20,10 +20,11 @@ const (
 	WAIT_TASK
 )
 
-type RpcGetTaskRequest struct {
+type GetTaskRequest struct {
+	Pid int
 }
 
-type RpcGetTaskResponse struct {
+type GetTaskResponse struct {
 	Task Task
 }
 
@@ -34,13 +35,13 @@ type Task struct {
 	TaskType  TaskType
 }
 
-type RpcTaskDoneRequest struct {
+type TaskCompletionRequest struct {
 	TaskId    int
 	FilePaths map[int]string
 	TaskType  TaskType
 }
 
-type RpcTaskDoneResponse struct {
+type TaskCompletionResponse struct {
 }
 
 // Add your RPC definitions here.

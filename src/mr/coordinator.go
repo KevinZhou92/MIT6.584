@@ -51,17 +51,17 @@ type Coordinator struct {
 // an example RPC handler.
 //
 // the RPC argument and reply types are defined in rpc.go.
-func (c *Coordinator) GetTask(args *RpcGetTaskRequest, reply *RpcGetTaskResponse) error {
+func (c *Coordinator) GetTask(request *GetTaskRequest, reply *GetTaskResponse) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	fmt.Printf("= Request request from worker %d to get a task\n", request.Pid)
 	// Default wait task
 	waitTask := c.getTaskForTaskType(WAIT_TASK)
 	reply.Task = *waitTask
 
-	mapTask := c.getTaskForTaskType(MAP_TASK)
-	if mapTask != nil {
-		fmt.Printf("= Get an available map task with task id %d", mapTask.TaskId)
+	if mapTask := c.getTaskForTaskType(MAP_TASK); mapTask != nil {
+		fmt.Printf("= Get an available map task with task id %d\n", mapTask.TaskId)
 		reply.Task = *mapTask
 		return nil
 	}
@@ -72,8 +72,7 @@ func (c *Coordinator) GetTask(args *RpcGetTaskRequest, reply *RpcGetTaskResponse
 	}
 
 	// Try to get a reduce task
-	reduceTask := c.getTaskForTaskType(REDUCE_TASK)
-	if reduceTask != nil {
+	if reduceTask := c.getTaskForTaskType(REDUCE_TASK); reduceTask != nil {
 		reply.Task = *reduceTask
 		return nil
 	}
@@ -116,27 +115,20 @@ func (c *Coordinator) areAllTasksDone(taskTypes ...TaskType) bool {
 
 func (c *Coordinator) getTaskForTaskType(taskType TaskType) *Task {
 	if taskType == MAP_TASK {
-		return c.getTask(c.mTasks, c.mTaskState, MAP_TASK)
+		return c.assignTask(c.mTasks, c.mTaskState, MAP_TASK)
 	} else if taskType == REDUCE_TASK {
-		return c.getTask(c.rTasks, c.rTaskState, REDUCE_TASK)
-	} else if taskType == WAIT_TASK {
-		return &Task{
-			TaskId:    -1,
-			FilePaths: []string{},
-			NReducer:  -1,
-			TaskType:  WAIT_TASK,
-		}
+		return c.assignTask(c.rTasks, c.rTaskState, REDUCE_TASK)
 	} else {
 		return &Task{
 			TaskId:    -1,
 			FilePaths: []string{},
 			NReducer:  -1,
-			TaskType:  EXIT_TASK,
+			TaskType:  taskType,
 		}
 	}
 }
 
-func (c *Coordinator) getTask(tasks map[int][]string, taskState map[int]*State, taskType TaskType) *Task {
+func (c *Coordinator) assignTask(tasks map[int][]string, taskState map[int]*State, taskType TaskType) *Task {
 	// Try to get mapper tasks
 	for taskId := range tasks {
 		taskState := taskState[taskId]
@@ -159,7 +151,7 @@ func (c *Coordinator) getTask(tasks map[int][]string, taskState map[int]*State, 
 	return nil
 }
 
-func (c *Coordinator) FinishTask(request *RpcTaskDoneRequest, reply *RpcTaskDoneResponse) error {
+func (c *Coordinator) FinishTask(request *TaskCompletionRequest, reply *TaskCompletionResponse) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

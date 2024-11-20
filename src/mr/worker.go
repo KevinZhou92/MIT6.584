@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var PID int = os.Getpid()
+
 type ByKey []KeyValue
 
 // for sorting by key.
@@ -38,7 +40,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 	shouldExit := false
 	for !shouldExit {
 		taskId, filePaths, nReduce, taskType := callGetTask()
-		fmt.Printf("= Get map task for taskId: %d, nReduce: %d\n", taskId, nReduce)
+		fmt.Printf("= Get a task for taskId: %d", taskId)
 		// Didn't get any task, sleep for 1 sec and try to get a task
 		switch taskType {
 		case MAP_TASK:
@@ -150,16 +152,14 @@ func executeReduceTask(taskId int, filePaths []string, reducef func(string, []st
 	callFinishTask(taskId, nil, REDUCE_TASK)
 }
 
-// example function to show how to make an RPC call to the coordinator.
-//
-// the RPC argument and reply types are defined in rpc.go.
 func callGetTask() (int, []string, int, TaskType) {
-
 	// declare an argument structure.
-	args := RpcGetTaskRequest{}
+	args := GetTaskRequest{
+		Pid: PID,
+	}
 
 	// declare a reply structure.
-	reply := RpcGetTaskResponse{}
+	reply := GetTaskResponse{}
 
 	// send the RPC request, wait for the reply.
 	// the "Coordinator.Example" tells the
@@ -170,7 +170,7 @@ func callGetTask() (int, []string, int, TaskType) {
 		return reply.Task.TaskId, reply.Task.FilePaths, reply.Task.NReducer, reply.Task.TaskType
 	} else {
 		fmt.Printf("call failed!\n")
-		return -1, []string{}, -1, WAIT_TASK
+		return -1, []string{}, -1, EXIT_TASK
 	}
 }
 
@@ -179,14 +179,14 @@ func callGetTask() (int, []string, int, TaskType) {
 // the RPC argument and reply types are defined in rpc.go.
 func callFinishTask(id int, output map[int]string, taskType TaskType) {
 	// declare an argument structure.
-	request := RpcTaskDoneRequest{
+	request := TaskCompletionRequest{
 		TaskId:    id,
 		FilePaths: output,
 		TaskType:  taskType,
 	}
 
 	// declare a reply structure.
-	reply := RpcTaskDoneResponse{}
+	reply := TaskCompletionResponse{}
 
 	// send the RPC request, wait for the reply.
 	// the "Coordinator.Example" tells the
