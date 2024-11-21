@@ -40,7 +40,7 @@ func Worker(mapf func(string, string) []KeyValue, reducef func(string, []string)
 	shouldExit := false
 	for !shouldExit {
 		taskId, filePaths, nReduce, taskType := callGetTask()
-		fmt.Printf("= Get a task for taskId: %d", taskId)
+		fmt.Printf("= Get a task for taskId: %d\n", taskId)
 		// Didn't get any task, sleep for 1 sec and try to get a task
 		switch taskType {
 		case MAP_TASK:
@@ -174,9 +174,6 @@ func callGetTask() (int, []string, int, TaskType) {
 	}
 }
 
-// example function to show how to make an RPC call to the coordinator.
-//
-// the RPC argument and reply types are defined in rpc.go.
 func callFinishTask(id int, output map[int]string, taskType TaskType) {
 	// declare an argument structure.
 	request := TaskCompletionRequest{
@@ -188,10 +185,6 @@ func callFinishTask(id int, output map[int]string, taskType TaskType) {
 	// declare a reply structure.
 	reply := TaskCompletionResponse{}
 
-	// send the RPC request, wait for the reply.
-	// the "Coordinator.Example" tells the
-	// receiving server that we'd like to call
-	// the Example() method of struct Coordinator.
 	ok := call("Coordinator.FinishTask", &request, &reply)
 	if ok {
 		fmt.Printf("= Task.Output %v\n", output)
@@ -219,4 +212,14 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 
 	fmt.Println(err)
 	return false
+}
+
+func getTmpFile(dir string, pattern string) (*os.File, error) {
+	file, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		fmt.Println("= can't create tmp file")
+		panic(err)
+	}
+
+	return file, nil
 }
