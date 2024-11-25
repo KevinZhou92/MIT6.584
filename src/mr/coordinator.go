@@ -57,10 +57,10 @@ func (c *Coordinator) GetTask(request *GetTaskRequest, reply *GetTaskResponse) e
 
 	fmt.Printf("= Request request from worker %d to get a task\n", request.Pid)
 	// Default wait task
-	waitTask := c.getTaskForTaskType(WAIT_TASK)
+	waitTask := c.assignTaskForTaskType(WAIT_TASK)
 	reply.Task = *waitTask
 
-	if mapTask := c.getTaskForTaskType(MAP_TASK); mapTask != nil {
+	if mapTask := c.assignTaskForTaskType(MAP_TASK); mapTask != nil {
 		fmt.Printf("= Get an available map task with task id %d\n", mapTask.TaskId)
 		reply.Task = *mapTask
 		return nil
@@ -72,14 +72,14 @@ func (c *Coordinator) GetTask(request *GetTaskRequest, reply *GetTaskResponse) e
 	}
 
 	// Try to get a reduce task
-	if reduceTask := c.getTaskForTaskType(REDUCE_TASK); reduceTask != nil {
+	if reduceTask := c.assignTaskForTaskType(REDUCE_TASK); reduceTask != nil {
 		reply.Task = *reduceTask
 		return nil
 	}
 
 	if c.areAllTasksDone(MAP_TASK, REDUCE_TASK) {
 		// Default response if there is not output
-		exitTask := c.getTaskForTaskType(EXIT_TASK)
+		exitTask := c.assignTaskForTaskType(EXIT_TASK)
 		reply.Task = *exitTask
 		return nil
 	}
@@ -113,7 +113,7 @@ func (c *Coordinator) areAllTasksDone(taskTypes ...TaskType) bool {
 	return allTasksDone
 }
 
-func (c *Coordinator) getTaskForTaskType(taskType TaskType) *Task {
+func (c *Coordinator) assignTaskForTaskType(taskType TaskType) *Task {
 	if taskType == MAP_TASK {
 		return c.assignTask(c.mTasks, c.mTaskState, MAP_TASK)
 	} else if taskType == REDUCE_TASK {
