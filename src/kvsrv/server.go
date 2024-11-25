@@ -1,7 +1,6 @@
 package kvsrv
 
 import (
-	"fmt"
 	"log"
 	"sync"
 )
@@ -24,9 +23,12 @@ type KVServer struct {
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+
 	key := args.Key
 	if value, present := kv.store[key]; present {
-		fmt.Printf("=[Get] Found value %s for key %s\n", value, key)
+		// fmt.Printf("=[Get] Found value %s for key %s\n", value, key)
 		reply.Value = value
 	} else {
 		reply.Value = ""
@@ -49,7 +51,7 @@ func (kv *KVServer) Append(args *PutAppendArgs, reply *PutAppendReply) {
 
 	key, value := args.Key, args.Value
 	existingValue := kv.store[key]
-	fmt.Printf("=[Append] Found existing value %s for key %s\n", existingValue, key)
+	// fmt.Printf("=[Append] Found existing value %s for key %s\n", existingValue, key)
 	newValue := existingValue + value
 	kv.store[key] = newValue
 
