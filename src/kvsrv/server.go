@@ -18,9 +18,16 @@ type KVServer struct {
 	mu sync.Mutex
 
 	// Your definitions here.
-	store      map[string]string
-	clientSeqs map[int64]int64
-	history    map[int64]string
+	store map[string]string
+	// The clientSeqs and history data structure only works if the client is calling server serially(1 by 1) so we can guarantee that
+	// history will always store the value for the previous reply, (each request will have an unique sequence number).
+	// If there are multiple calls concurrently then they will share the same sequence number, then we can't simply store a client id -> seq mapping
+	history map[int64]*Reply
+}
+
+type Reply struct {
+	Value string
+	Seq   int64
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
@@ -43,16 +50,13 @@ func (kv *KVServer) Put(args *PutAppendArgs, reply *PutAppendReply) {
 	defer kv.mu.Unlock()
 
 	key, value, newSeq, clientId := args.Key, args.Value, args.Seq, args.ClientId
-	curSeq, present := kv.clientSeqs[clientId]
+	lastReply, present := kv.history[clientId]
 	// log.Printf("=[Put]: client id %d, curSeq %d, newSeq %d, present %t", clientId, curSeq, newSeq, present)
-	if present && curSeq >= newSeq {
-		reply.Ack = curSeq
+	if present && lastReply.Seq >= newSeq {
 		return
 	}
 
 	kv.store[key] = value
-	reply.Ack = newSeq
-	kv.clientSeqs[clientId] = newSeq
 }
 
 func (kv *KVServer) Append(args *PutAppendArgs, reply *PutAppendReply) {
@@ -61,13 +65,12 @@ func (kv *KVServer) Append(args *PutAppendArgs, reply *PutAppendReply) {
 	defer kv.mu.Unlock()
 
 	key, value, newSeq, clientId := args.Key, args.Value, args.Seq, args.ClientId
-	curSeq, present := kv.clientSeqs[clientId]
+	lastReply, present := kv.history[clientId]
 
 	existingValue := kv.store[key]
 	// fmt.Printf("=[Append] Found existing value %s for key %s\n", existingValue, key)
-	if present && curSeq >= newSeq {
-		reply.Value = kv.history[clientId]
-		reply.Ack = curSeq
+	if present && lastReply.Seq >= newSeq {
+		reply.Value = kv.history[clientId].Value
 		return
 	}
 
@@ -75,9 +78,10 @@ func (kv *KVServer) Append(args *PutAppendArgs, reply *PutAppendReply) {
 	kv.store[key] = newValue
 
 	reply.Value = existingValue
-	reply.Ack = newSeq
-	kv.clientSeqs[clientId] = newSeq
-	kv.history[clientId] = existingValue
+	kv.history[clientId] = &Reply{
+		Value: existingValue,
+		Seq:   newSeq,
+	}
 }
 
 func StartKVServer() *KVServer {
@@ -85,8 +89,7 @@ func StartKVServer() *KVServer {
 
 	// You may need initialization code here.
 	kv.store = make(map[string]string)
-	kv.clientSeqs = make(map[int64]int64)
-	kv.history = make(map[int64]string)
+	kv.history = make(map[int64]*Reply)
 
 	return kv
 }

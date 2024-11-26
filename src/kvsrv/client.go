@@ -70,7 +70,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) string {
 	args := PutAppendArgs{
 		Key:      key,
 		Value:    value,
-		Seq:      ck.seq,
+		Seq:      ck.GetSeq(),
 		ClientId: ck.clientId,
 	}
 
@@ -80,7 +80,7 @@ func (ck *Clerk) PutAppend(key string, value string, op string) string {
 	for !ok {
 		ok = ck.server.Call("KVServer."+op, &args, &reply)
 	}
-	ck.seq = reply.Ack + 1
+
 	// log.Printf("=[PutAppend]-After: client id %d, curSeq %d", ck.clientId, ck.seq)
 
 	return reply.Value
@@ -93,4 +93,11 @@ func (ck *Clerk) Put(key string, value string) {
 // Append value to key's value and return that value
 func (ck *Clerk) Append(key string, value string) string {
 	return ck.PutAppend(key, value, "Append")
+}
+
+func (ck *Clerk) GetSeq() (SendSeq int64) {
+	SendSeq = ck.seq
+	ck.seq += 1
+
+	return
 }
