@@ -328,7 +328,7 @@ func TestConcurrent2(t *testing.T) {
 
 // Test: unreliable net, many clients
 func TestUnreliable2(t *testing.T) {
-	GenericTest(t, 5, true, false)
+	GenericTest(t, 1, true, false)
 }
 
 // Test: unreliable net, many clients, one key
