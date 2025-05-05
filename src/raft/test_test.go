@@ -8,12 +8,14 @@ package raft
 // test with the original before submitting.
 //
 
-import "testing"
-import "fmt"
-import "time"
-import "math/rand"
-import "sync/atomic"
-import "sync"
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
 
 // The tester generously allows solutions to complete elections in one second
 // (much more than the paper's range of timeouts).
@@ -96,7 +98,6 @@ func TestManyElections3A(t *testing.T) {
 	defer cfg.cleanup()
 
 	cfg.begin("Test (3A): multiple elections")
-
 	cfg.checkOneLeader()
 
 	iters := 10
@@ -293,7 +294,10 @@ func TestFailAgree3B(t *testing.T) {
 	// the full set of servers should preserve
 	// previous agreements, and be able to agree
 	// on new commands.
+
+	fmt.Println("==Timeout elapsed")
 	cfg.one(106, servers, true)
+	fmt.Println("==Timeout elapsed2")
 	time.Sleep(RaftElectionTimeout)
 	cfg.one(107, servers, true)
 
