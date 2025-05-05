@@ -295,9 +295,7 @@ func TestFailAgree3B(t *testing.T) {
 	// previous agreements, and be able to agree
 	// on new commands.
 
-	fmt.Println("==Timeout elapsed")
 	cfg.one(106, servers, true)
-	fmt.Println("==Timeout elapsed2")
 	time.Sleep(RaftElectionTimeout)
 	cfg.one(107, servers, true)
 

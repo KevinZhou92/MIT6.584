@@ -238,7 +238,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	Debug(dLog, "Server %d received a log %s\n", rf.me, args)
 	if leaderCommitIndex > rf.logState.commitIndex {
-		Debug(dWarn, "Server %d's commitIndex %d is behind leader's commitIndex %d, server log count: %d\n", rf.me, rf.logState.commitIndex, leaderCommitIndex, len(rf.logs))
+		Debug(dWarn, "Server %d's commitIndex %d is behind leader %d's commitIndex %d, server log count: %d\n", rf.me, rf.logState.commitIndex, args.LeaderId, leaderCommitIndex, len(rf.logs))
 		rf.logState.commitIndex = min(leaderCommitIndex, len(rf.logs)-1)
 		Debug(dLog, "Server %d commitIndex: %d\n", rf.me, rf.logState.commitIndex)
 	}
