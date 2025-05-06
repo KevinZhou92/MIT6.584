@@ -635,7 +635,7 @@ func (cfg *config) end() {
 		cfg.mu.Unlock()
 
 		fmt.Printf("  ... Passed --")
-		fmt.Printf(" time: %4.1f peers: %d nrpc: %4d nbytes: %7d nAgreements: %4d\n", t, npeers, nrpc, nbytes, ncmds)
+		fmt.Printf(" time: %4.1fsec peers: %d nrpc: %4d nbytes: %7d nAgreements: %4d\n", t, npeers, nrpc, nbytes, ncmds)
 	}
 }
 

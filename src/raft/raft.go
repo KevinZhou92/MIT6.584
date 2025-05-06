@@ -59,12 +59,6 @@ const (
 	FOLLOWER
 )
 
-var roleMap = map[Role]string{
-	LEADER:    "Leader",
-	CANDIDATE: "Candidate",
-	FOLLOWER:  "Follower",
-}
-
 type State struct {
 	role        Role
 	currentTerm int
@@ -209,6 +203,10 @@ type AppendEntriesReply struct {
 	// Your data here (3A, 3B).
 	Term    int
 	Success bool
+
+	// Conflict Info
+	ConflictEntryIndex int
+	ConflictEntryTerm  int
 }
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
@@ -220,7 +218,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// could be a heartbeat message from a leader
 	if len(args.Entries) == 0 && args.Term >= rf.state.currentTerm {
-		Debug(dInfo, "Server %d received heartbeat from leader id %d\n", rf.me, args.LeaderId)
+		Debug(dInfo, "Server %d received heartbeat from leader id %d with args %v\n", rf.me, args.LeaderId, args)
 		rf.state.votedFor = -1
 		rf.state.role = FOLLOWER
 		rf.state.currentTerm = args.Term
@@ -228,47 +226,53 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// not a heart beat message, processing logs from append entries request
 	reply.Success = false
-	reply.Term = -1
 	reqTerm := args.Term
+	reply.Term = reqTerm
 	// leaderId := args.LeaderId
 	entries := args.Entries
 	prevLogIndex := args.PrevLogIndex
-	preLogTerm := args.PrevLogTerm
+	prevLogTerm := args.PrevLogTerm
 	leaderCommitIndex := args.LeaderCommit
-
-	Debug(dLog, "Server %d received a log %s\n", rf.me, args)
-	if leaderCommitIndex > rf.logState.commitIndex {
-		Debug(dWarn, "Server %d's commitIndex %d is behind leader %d's commitIndex %d, server log count: %d\n", rf.me, rf.logState.commitIndex, args.LeaderId, leaderCommitIndex, len(rf.logs))
-		rf.logState.commitIndex = min(leaderCommitIndex, len(rf.logs)-1)
-		Debug(dLog, "Server %d commitIndex: %d\n", rf.me, rf.logState.commitIndex)
-	}
 
 	// reply false if term < current term
 	if reqTerm < rf.state.currentTerm {
-		Debug(dWarn, "Server %d's term is greater than request's term\n", rf.me)
+		Debug(dWarn, "Server %d's term is greater than %d's term %d\n", rf.me, args.LeaderId, reqTerm)
 		reply.Term = rf.state.currentTerm
 		return
 	}
 
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
-	if prevLogIndex >= len(rf.logs) || (prevLogIndex > 0 && rf.logs[prevLogIndex].Term != preLogTerm) {
-		Debug(dWarn, "Server %d's term at prevLogIndex doesn't match\n", rf.me)
+	if prevLogIndex >= len(rf.logs) || (prevLogIndex > 0 && rf.logs[prevLogIndex].Term != prevLogTerm) {
+		Debug(dWarn, "Server %d's term at prevLogIndex %d doesn't match prevLogTerm %d\n", rf.me, prevLogIndex, prevLogTerm)
+
 		return
 	}
 
-	// Truncate log if prevLogIndex is not the last log in current peer's log
-	if prevLogIndex > 0 && prevLogIndex != len(rf.logs)-1 {
+	// Truncate log if prevLogIndex is not the last log in current peer's log.This could happen during a split brain scenario.
+	// Note that we should not truncte committed log as once log is committed it it durable
+	serverCommitIdIndex := rf.logState.commitIndex
+	if prevLogIndex > 0 && prevLogIndex < len(rf.logs) && prevLogIndex >= serverCommitIdIndex && prevLogIndex != len(rf.logs)-1 {
+		Debug(dWarn, "Server %d's lastLogIndex %d is not equal to prevLogIndex %d, truncate logs\n", rf.me, len(rf.logs)-1, prevLogIndex)
 		rf.logs = rf.logs[:prevLogIndex+1]
 	}
+
+	Debug(dLog, "Server %d received a log %s\n", rf.me, args)
 
 	if len(entries) != 0 {
 		rf.logs = append(rf.logs, entries...)
 		Debug(dLog, "Server %d append entries in log\n", rf.me)
 	}
+
+	// This check should happen after any potential log truncate that will happen during an appentry behavior
+	// Otherwise we could end up mistakenly updating commit index on current peer
+	if leaderCommitIndex > rf.logState.commitIndex {
+		Debug(dWarn, "Server %d's commitIndex %d is behind leader %d's commitIndex %d, server log count: %d\n", rf.me, rf.logState.commitIndex, args.LeaderId, leaderCommitIndex, len(rf.logs))
+		rf.logState.commitIndex = min(leaderCommitIndex, len(rf.logs)-1)
+	}
+
 	Debug(dLog, "Server %d logs: %v\n", rf.me, rf.logs)
-
+	reply.Term = rf.state.currentTerm
 	reply.Success = true
-
 }
 
 // example RequestVote RPC handler.
@@ -280,7 +284,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.lastCommTime = time.Now()
 
 	Debug(dVote, "Server %d received request vote, current votedFor %d\n", rf.me, rf.state.votedFor)
-	requestTerm := args.Term
+	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
 	reply.VoteGranted = false
 	// requester's term is smaller than current peer's term
 	if requestTerm < rf.state.currentTerm {
@@ -290,9 +294,17 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// requester's term is greater than current peer's term, convert current peer to follower
 	if requestTerm > rf.state.currentTerm {
+		Debug(dVote, "Server %d's term is lower than server %d's term %d\n", rf.me, candidateId, requestTerm)
 		rf.state.currentTerm = requestTerm
 		rf.state.role = FOLLOWER
 		rf.state.votedFor = -1
+	}
+
+	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
+		Debug(dVote, "Server %d's log/term is more up-to-date than candidate %d's\n", rf.me, candidateId)
+		reply.Term = rf.state.currentTerm
+		reply.VoteGranted = false
+		return
 	}
 
 	// vote for requester
@@ -328,7 +340,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	}
 
 	index := rf.appendLogLocally(LogEntry{term, command})
-	Debug(dVote, "Server %d appended log locally", rf.me)
 
 	return index, term, isLeader
 }
@@ -338,6 +349,9 @@ func (rf *Raft) appendLogLocally(logEntry LogEntry) int {
 	defer rf.mu.Unlock()
 
 	rf.logs = append(rf.logs, logEntry)
+	rf.peerIndexState.nextIndex[rf.me] = len(rf.logs)
+	rf.peerIndexState.matchIndex[rf.me] = len(rf.logs) - 1
+	Debug(dLog, "Server %d appended log %v", rf.me, logEntry)
 
 	return len(rf.logs) - 1
 }
@@ -350,22 +364,22 @@ func (rf *Raft) sendHeartbeat() {
 			continue
 		}
 
-		currentTerm := rf.getCurrentTerm()
-		for idx, _ := range rf.peers {
-			if idx == rf.me {
+		for server := range rf.peers {
+			if server == rf.me {
 				continue
 			}
-			appendEntriesArgs := AppendEntriesArgs{
-				currentTerm, rf.me, []LogEntry{}, -1, -1, rf.getServerCommitIndex()}
-			appendEntriesReply := AppendEntriesReply{}
-			go rf.sendAppendEntries(idx, &appendEntriesArgs, &appendEntriesReply)
+
+			go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
 		}
 		// Debug(dInfo, "Server %d sent heartbeat to followers", rf.me)
 	}
 }
 
 func (rf *Raft) getVote(resultChan chan RequestVoteReply, server int) {
-	requestVoteArgs := RequestVoteArgs{rf.state.currentTerm, rf.me, -1, -1}
+	lastLogIndex := rf.getLogSize() - 1
+	lastLogTerm := rf.getLogEntry(lastLogIndex).Term
+
+	requestVoteArgs := RequestVoteArgs{rf.state.currentTerm, rf.me, lastLogIndex, lastLogTerm}
 	requestVoteReply := RequestVoteReply{}
 	ok := rf.sendRequestVote(server, &requestVoteArgs, &requestVoteReply)
 	if !ok {
@@ -441,6 +455,7 @@ func (rf *Raft) election() {
 			}
 			// Found a peer with a greater term, this peer can't become the leader anymore, stop the leader election
 			if reply.Term > currentTerm {
+				Debug(dVote, "Server %d's term %d is lower than peers", rf.me, currentTerm)
 				rf.setState(FOLLOWER, reply.Term, -1)
 				return
 			}
@@ -450,17 +465,16 @@ func (rf *Raft) election() {
 				Debug(dLeader, "Server %d has %d votes. Server %d is leader now\n", rf.me, votes, rf.me)
 				rf.setState(LEADER, currentTerm, rf.me)
 				rf.initializePeerIndexState()
-				go rf.runReplicaCounter()
 				for server := range rf.peers {
 					if server == rf.me {
 						continue
 					}
-					appendEntriesArgs := AppendEntriesArgs{
-						currentTerm, rf.me, []LogEntry{}, -1, -1, rf.getServerCommitIndex()}
-					appendEntriesReply := AppendEntriesReply{}
+
+					go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
 					go rf.runLogReplicator(server)
-					go rf.sendAppendEntries(server, &appendEntriesArgs, &appendEntriesReply)
 				}
+				go rf.runReplicaCounter()
+
 				return
 			}
 		case <-deadline:
@@ -479,46 +493,35 @@ func (rf *Raft) election() {
 // term to monitor replication progress and commit logs accordingly.
 func (rf *Raft) runReplicaCounter() {
 	for !rf.killed() {
-		// Stop log replicator is current peer is not leader anymore
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
 			return
 		}
 
 		currentTerm := rf.getCurrentTerm()
-		startIndex := 0
-		// find the starting log entry of current term
-		for startIndex < len(rf.logs) && rf.getLogEntry(startIndex).Term < currentTerm {
-			startIndex += 1
-		}
+		majorityIndex := rf.getMajorityIndex()
 
-		for {
-			countOfReplica := 0
-			matchIndex := rf.getMatchIndex()
-			for server := range matchIndex {
-				if matchIndex[server] < startIndex {
-					continue
-				}
-				countOfReplica += 1
-
-				if countOfReplica < len(rf.peers)/2 {
-					continue
-				}
-
-				Debug(dLeader, "Server %d replicated log %d to majority, update leader commit\n", rf.me, startIndex)
-				rf.getLogState().commitIndex = startIndex
-				startIndex += 1
-				break
-			}
+		if majorityIndex >= rf.getLogSize() {
 			time.Sleep(10 * time.Millisecond)
+			continue
 		}
 
+		entry := rf.getLogEntry(majorityIndex)
+		if entry.Term != currentTerm {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+
+		Debug(dLeader, "Server %d replicated log %d to majority, update leader commit\n", rf.me, majorityIndex)
+		rf.setServerCommitIndex(majorityIndex)
+
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
 func (rf *Raft) runLogReplicator(server int) {
 	Debug(dLeader, "Server %d started log replicator for server %d\n", rf.me, server)
 	for !rf.killed() {
-		time.Sleep(100 * time.Millisecond)
+		Debug(dLeader, "Server %d try to replicate log to server %d", rf.me, server)
 		// Stop log replicator is current peer is not leader anymore
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
 			return
@@ -526,43 +529,45 @@ func (rf *Raft) runLogReplicator(server int) {
 
 		currentTerm := rf.getCurrentTerm()
 		leaderCommitIndex := rf.getServerCommitIndex()
-		nextIndex := rf.peerIndexState.nextIndex[server]
+		nextIndex := rf.getNextIndexForPeer(server)
 		prevLogIndex := nextIndex - 1
-		prevLogTerm := rf.logs[prevLogIndex].Term
+		prevLog := rf.getLogEntry(prevLogIndex)
+		prevLogTerm := prevLog.Term
 
-		if nextIndex >= len(rf.logs) {
+		if nextIndex >= rf.getLogSize() {
 			Debug(dLeader, "Server %d has no logs to replicate for server %d", rf.me, server)
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
-		appendEntriesArgs := AppendEntriesArgs{currentTerm, rf.me, []LogEntry{rf.logs[nextIndex]}, prevLogIndex, prevLogTerm, leaderCommitIndex}
+		logEntry := rf.getLogEntry(nextIndex)
+		appendEntriesArgs := AppendEntriesArgs{currentTerm, rf.me, []LogEntry{logEntry}, prevLogIndex, prevLogTerm, leaderCommitIndex}
 		appendEntriesReply := AppendEntriesReply{}
 
 		ok := rf.sendAppendEntries(server, &appendEntriesArgs, &appendEntriesReply)
 		if !ok {
-			Debug(dLog, "Server %d couldn't replicate log to server %d", rf.me, server)
+			Debug(dLog, "Server %d rpc call to server %d failed", rf.me, server)
 			continue
 		}
 
 		// Leader is not with the highest term, step down to follower
 		if appendEntriesReply.Term > currentTerm {
-			Debug(dWarn, "Server %d is not leader anymore", rf.me)
+			Debug(dWarn, "Server %d is not leader anymore cuz there is a peer has a higher term", rf.me)
 			rf.setState(FOLLOWER, appendEntriesReply.Term, -1)
 			continue
 		}
 
 		// Couldn't replicate message, log mismatch found from peer, reduce nextIndex and retry
 		if !appendEntriesReply.Success {
-			Debug(dWarn, "Server %d couldn't replicate log, reduce nextIndex to %d", rf.me, nextIndex-1)
-			rf.peerIndexState.nextIndex[server] -= 1
+			Debug(dWarn, "Server %d couldn't replicate log to server %d, reduce nextIndex to %d", rf.me, server, nextIndex-1)
+			rf.setNextIndexForPeer(server, nextIndex-1)
 			continue
 		}
 
 		// Message replication succeeded, update nextIndex and matchIndex
-		Debug(dCommit, "Server %d replicate log %d to server %d, update index", rf.me, nextIndex, server)
-		rf.peerIndexState.matchIndex[server] = rf.peerIndexState.nextIndex[server]
-		rf.peerIndexState.nextIndex[server] += 1
-
+		Debug(dCommit, "Server %d replicated log %d to server %d, update next index to %d", rf.me, nextIndex, server, nextIndex+1)
+		rf.setMatchIndexForPeer(server, nextIndex)
+		rf.setNextIndexForPeer(server, nextIndex+1)
 	}
 }
 
@@ -573,13 +578,14 @@ func (rf *Raft) runApplier() {
 		lastAppliedIndex := rf.getServerAppliedIndex()
 		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, commitIndex, lastAppliedIndex)
 		for curIndex := lastAppliedIndex + 1; curIndex <= commitIndex; curIndex += 1 {
+			Debug(dCommit, "Server %d get index %d command, log count %d", rf.me, curIndex, rf.getLogSize())
 			cmd := rf.getLogEntry(curIndex).Command
 			applyMsg := ApplyMsg{true, cmd, curIndex, false, nil, -1, -1}
 			rf.applyCh <- applyMsg
 			rf.setServerAppliedIndex(curIndex)
-			Debug(dInfo, "Server %d applied a message, lastAppliedIndex %d", rf.me, curIndex)
 		}
 		time.Sleep(100 * time.Millisecond)
+		//Debug(dInfo, "Server %d applied a message, lastAppliedIndex %d", rf.me, rf.getServerAppliedIndex())
 	}
 }
 
@@ -603,7 +609,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastCommTime = time.Now()
 	rf.state = &State{FOLLOWER, 0, -1}
 	rf.logs = []LogEntry{
-		{Term: 0, Command: ""},
+		{Term: 0, Command: 0},
 	}
 	rf.logState = &LogState{len(rf.logs) - 1, 0}
 	rf.applyCh = applyCh

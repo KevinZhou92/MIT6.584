@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"sort"
 	"time"
 )
 
@@ -42,11 +43,13 @@ func (rf *Raft) getLeaderInfo() (int, bool) {
 	return leaderId, isLeader
 }
 
-func (rf *Raft) getPrevLogInfo() (int, int) {
+func (rf *Raft) getPrevLogInfo(server int) (int, int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return len(rf.logs) - 1, rf.logs[len(rf.logs)-1].Term
+	prevLogIndex := rf.peerIndexState.nextIndex[server] - 1
+	prevLogTerm := rf.logs[prevLogIndex].Term
+	return prevLogIndex, prevLogTerm
 
 }
 
@@ -94,13 +97,6 @@ func (rf *Raft) setState(role Role, term int, votedFor int) {
 	rf.state.votedFor = votedFor
 }
 
-func (rf *Raft) getMatchIndex() []int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.peerIndexState.matchIndex
-}
-
 // volatile state on all servers
 func (rf *Raft) getLogEntry(logIndex int) LogEntry {
 	rf.mu.Lock()
@@ -109,21 +105,14 @@ func (rf *Raft) getLogEntry(logIndex int) LogEntry {
 	return rf.logs[logIndex]
 }
 
+func (rf *Raft) getLogSize() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return len(rf.logs)
+}
+
 // volatile state on all servers
-func (rf *Raft) getLogState() *LogState {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.logState
-}
-
-func (rf *Raft) setLogState(logState LogState) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.logState = &logState
-}
-
 func (rf *Raft) initializePeerIndexState() {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -137,6 +126,52 @@ func (rf *Raft) initializePeerIndexState() {
 		rf.peerIndexState.nextIndex[idx] = len(rf.logs)
 		rf.peerIndexState.matchIndex[idx] = 0
 	}
+}
+
+func (rf *Raft) setMatchIndexForPeer(server int, index int) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	rf.peerIndexState.matchIndex[server] = index
+}
+
+func (rf *Raft) getNextIndexForPeer(server int) int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.peerIndexState.nextIndex[server]
+}
+
+func (rf *Raft) setNextIndexForPeer(server int, index int) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	rf.peerIndexState.nextIndex[server] = index
+}
+
+func (rf *Raft) getMajorityIndex() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	matchIndices := append([]int(nil), rf.peerIndexState.matchIndex...)
+
+	sort.Ints(matchIndices)
+	majorityIndex := matchIndices[(len(matchIndices)-1)/2]
+
+	return majorityIndex
+}
+
+// ---------------------
+// RPC Utils
+// ---------------------
+func (rf *Raft) buildHeartBeatArgs(server int) *AppendEntriesArgs {
+	currentTerm := rf.getCurrentTerm()
+	prevLogIndex, prevLogTerm := rf.getPrevLogInfo(server)
+	leaderCommitIndex := rf.getServerCommitIndex()
+	appendEntriesArgs := AppendEntriesArgs{
+		currentTerm, rf.me, []LogEntry{}, prevLogIndex, prevLogTerm, leaderCommitIndex}
+
+	return &appendEntriesArgs
 }
 
 // example code to send a RequestVote RPC to a server.
