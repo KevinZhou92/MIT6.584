@@ -164,24 +164,6 @@ type LogEntry struct {
 	Command interface{}
 }
 
-// example RequestVote RPC arguments structure.
-// field names must start with capital letters!
-type RequestVoteArgs struct {
-	// Your data here (3A, 3B).
-	Term         int
-	CandidateId  int
-	LastLogIndex int
-	LastLogTerm  int
-}
-
-// example RequestVote RPC reply structure.
-// field names must start with capital letters!
-type RequestVoteReply struct {
-	// Your data here (3A).
-	Term        int
-	VoteGranted bool
-}
-
 type AppendEntriesArgs struct {
 	// Your data here (3A, 3B).
 	Term         int
@@ -217,8 +199,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.lastCommTime = time.Now()
 
 	// could be a heartbeat message from a leader
-	if len(args.Entries) == 0 && args.Term >= rf.state.currentTerm {
+	if len(args.Entries) == 0 {
 		Debug(dInfo, "Server %d received heartbeat from leader id %d with args %v\n", rf.me, args.LeaderId, args)
+	}
+
+	if args.Term >= rf.state.currentTerm {
 		rf.state.votedFor = -1
 		rf.state.role = FOLLOWER
 		rf.state.currentTerm = args.Term
@@ -228,6 +213,9 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Success = false
 	reqTerm := args.Term
 	reply.Term = reqTerm
+	reply.ConflictEntryIndex = -1
+	reply.ConflictEntryTerm = -1
+
 	// leaderId := args.LeaderId
 	entries := args.Entries
 	prevLogIndex := args.PrevLogIndex
@@ -244,21 +232,34 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
 	if prevLogIndex >= len(rf.logs) || (prevLogIndex > 0 && rf.logs[prevLogIndex].Term != prevLogTerm) {
 		Debug(dWarn, "Server %d's term at prevLogIndex %d doesn't match prevLogTerm %d\n", rf.me, prevLogIndex, prevLogTerm)
+		index := prevLogIndex
+		for index < len(rf.logs) && index > 0 && rf.logs[index].Term != prevLogTerm {
+			index -= 1
+		}
+		if 0 < index && index < len(rf.logs) {
+			reply.ConflictEntryIndex = index + 1
+			reply.ConflictEntryTerm = rf.logs[index+1].Term
+		}
 
 		return
 	}
 
 	// Truncate log if prevLogIndex is not the last log in current peer's log.This could happen during a split brain scenario.
 	// Note that we should not truncte committed log as once log is committed it it durable
-	serverCommitIdIndex := rf.logState.commitIndex
-	if prevLogIndex > 0 && prevLogIndex < len(rf.logs) && prevLogIndex >= serverCommitIdIndex && prevLogIndex != len(rf.logs)-1 {
-		Debug(dWarn, "Server %d's lastLogIndex %d is not equal to prevLogIndex %d, truncate logs\n", rf.me, len(rf.logs)-1, prevLogIndex)
-		rf.logs = rf.logs[:prevLogIndex+1]
-	}
+	// serverCommitIdIndex := rf.logState.commitIndex
+	// if prevLogIndex > 0 && prevLogIndex < len(rf.logs) && prevLogIndex >= serverCommitIdIndex && prevLogIndex != len(rf.logs)-1 {
+	// 	Debug(dWarn, "Server %d's lastLogIndex %d is not equal to prevLogIndex %d, truncate logs\n", rf.me, len(rf.logs)-1, prevLogIndex)
+	// 	rf.logs = rf.logs[:prevLogIndex+1]
+	// }
 
 	Debug(dLog, "Server %d received a log %s\n", rf.me, args)
 
 	if len(entries) != 0 {
+		if prevLogIndex >= rf.logState.commitIndex && prevLogIndex+1 <= len(rf.logs) {
+			rf.logs = rf.logs[:prevLogIndex+1]
+			Debug(dLog, "Server %d truncated its log to index %d", rf.me, prevLogIndex)
+		}
+
 		rf.logs = append(rf.logs, entries...)
 		Debug(dLog, "Server %d append entries in log\n", rf.me)
 	}
@@ -267,7 +268,24 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// Otherwise we could end up mistakenly updating commit index on current peer
 	if leaderCommitIndex > rf.logState.commitIndex {
 		Debug(dWarn, "Server %d's commitIndex %d is behind leader %d's commitIndex %d, server log count: %d\n", rf.me, rf.logState.commitIndex, args.LeaderId, leaderCommitIndex, len(rf.logs))
-		rf.logState.commitIndex = min(leaderCommitIndex, len(rf.logs)-1)
+		newCommitIndex := rf.logState.commitIndex
+		// Find last new entry from current term, we should only commit the entry that belongs to current term
+		// For example,
+		// The original leader (Term 2) appends a log entry at index 4, but it fails to replicate it to a majority of followers.
+		// The original leader crashes or gets partitioned.
+		// The remaining two followers elect a new leader (Term 3).
+		// The new leader writes a new log entry at index 4 (with Term 3), effectively overwriting the uncommitted entry from the old leader.
+		// The new leader commits up to index 4 after successfully replicating it to a majority.
+		// The old leader rejoins the cluster and steps down as a follower. It receives an AppendEntries RPC from the new leader with commitIndex = 4.
+		// The old leader blindly sets its commit index to 4, without checking whether its log at index 4 matches the leader’s log term (Term 3).
+		// As a result, the old leader incorrectly considers its own log at index 4 (Term 2) as committed, violating Raft’s safety property.
+		// So we should just commit entry from current term
+		for i := rf.logState.commitIndex + 1; i <= min(leaderCommitIndex, len(rf.logs)-1); i++ {
+			if rf.logs[i].Term == rf.state.currentTerm {
+				newCommitIndex = i
+			}
+		}
+		rf.logState.commitIndex = newCommitIndex
 	}
 
 	Debug(dLog, "Server %d logs: %v\n", rf.me, rf.logs)
@@ -275,48 +293,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Success = true
 }
 
-// example RequestVote RPC handler.
-func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// Your code here (3A, 3B).
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.lastCommTime = time.Now()
-
-	Debug(dVote, "Server %d received request vote, current votedFor %d\n", rf.me, rf.state.votedFor)
-	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
-	reply.VoteGranted = false
-	// requester's term is smaller than current peer's term
-	if requestTerm < rf.state.currentTerm {
-		reply.Term = rf.state.currentTerm
-		return
-	}
-
-	// requester's term is greater than current peer's term, convert current peer to follower
-	if requestTerm > rf.state.currentTerm {
-		Debug(dVote, "Server %d's term is lower than server %d's term %d\n", rf.me, candidateId, requestTerm)
-		rf.state.currentTerm = requestTerm
-		rf.state.role = FOLLOWER
-		rf.state.votedFor = -1
-	}
-
-	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
-		Debug(dVote, "Server %d's log/term is more up-to-date than candidate %d's\n", rf.me, candidateId)
-		reply.Term = rf.state.currentTerm
-		reply.VoteGranted = false
-		return
-	}
-
-	// vote for requester
-	if rf.state.votedFor == -1 {
-		rf.state.votedFor = args.CandidateId
-		rf.state.currentTerm = args.Term
-		reply.VoteGranted = true
-		reply.Term = requestTerm
-		Debug(dVote, "Server %d votedFor server %d\n", rf.me, args.CandidateId)
-		return
-	}
-}
 
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
@@ -375,20 +351,6 @@ func (rf *Raft) sendHeartbeat() {
 	}
 }
 
-func (rf *Raft) getVote(resultChan chan RequestVoteReply, server int) {
-	lastLogIndex := rf.getLogSize() - 1
-	lastLogTerm := rf.getLogEntry(lastLogIndex).Term
-
-	requestVoteArgs := RequestVoteArgs{rf.state.currentTerm, rf.me, lastLogIndex, lastLogTerm}
-	requestVoteReply := RequestVoteReply{}
-	ok := rf.sendRequestVote(server, &requestVoteArgs, &requestVoteReply)
-	if !ok {
-		return
-	}
-
-	resultChan <- requestVoteReply
-}
-
 // the tester doesn't halt goroutines created by Raft after each test,
 // but it does call the Kill() method. your code can use killed() to
 // check whether Kill() has been called. the use of atomic avoids the
@@ -426,64 +388,6 @@ func (rf *Raft) ticker() {
 	}
 }
 
-func (rf *Raft) election() {
-	Debug(dVote, "Server %d started election, current term %d", rf.me, rf.getCurrentTerm())
-	ms := 50 + (rand.Int63() % 300)
-	deadline := time.After(time.Duration(ms) * time.Millisecond)
-
-	resultCh := make(chan RequestVoteReply, len(rf.peers))
-	for idx := range rf.peers {
-		if idx == rf.me {
-			continue
-		}
-		if !rf.isCandidate() {
-			return
-		}
-
-		go rf.getVote(resultCh, idx)
-	}
-
-	currentTerm := rf.getCurrentTerm()
-	votes := 1
-	collected := 1
-	for collected < len(rf.peers) {
-		select {
-		case reply := <-resultCh:
-			if reply.VoteGranted {
-				votes += 1
-				Debug(dVote, "Server %d received a vote, current vote %d\n", rf.me, votes)
-			}
-			// Found a peer with a greater term, this peer can't become the leader anymore, stop the leader election
-			if reply.Term > currentTerm {
-				Debug(dVote, "Server %d's term %d is lower than peers", rf.me, currentTerm)
-				rf.setState(FOLLOWER, reply.Term, -1)
-				return
-			}
-			collected += 1
-			// Elected as leader
-			if votes > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d has %d votes. Server %d is leader now\n", rf.me, votes, rf.me)
-				rf.setState(LEADER, currentTerm, rf.me)
-				rf.initializePeerIndexState()
-				for server := range rf.peers {
-					if server == rf.me {
-						continue
-					}
-
-					go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
-					go rf.runLogReplicator(server)
-				}
-				go rf.runReplicaCounter()
-
-				return
-			}
-		case <-deadline:
-			Debug(dInfo, "Server %d nothing happened during election. Waiting for new election\n", rf.me)
-			rf.setVotedFor(-1)
-			return
-		}
-	}
-}
 
 // runReplicaCounter tracks the number of replicas that have acknowledged
 // each log entry. Once a log entry is acknowledged by a majority of peers,
@@ -560,7 +464,12 @@ func (rf *Raft) runLogReplicator(server int) {
 		// Couldn't replicate message, log mismatch found from peer, reduce nextIndex and retry
 		if !appendEntriesReply.Success {
 			Debug(dWarn, "Server %d couldn't replicate log to server %d, reduce nextIndex to %d", rf.me, server, nextIndex-1)
-			rf.setNextIndexForPeer(server, nextIndex-1)
+			if appendEntriesReply.ConflictEntryTerm != -1 {
+				conflictEntryIndex := appendEntriesReply.ConflictEntryIndex
+				rf.setNextIndexForPeer(server, conflictEntryIndex)
+			} else {
+				rf.setNextIndexForPeer(server, nextIndex-1)
+			}
 			continue
 		}
 
