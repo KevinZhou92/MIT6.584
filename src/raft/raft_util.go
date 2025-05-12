@@ -11,28 +11,28 @@ func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 
 	curTime := time.Now()
 
-	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.state.role == FOLLOWER || rf.state.role == CANDIDATE)
+	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.state.Role == FOLLOWER || rf.state.Role == CANDIDATE)
 }
 
 func (rf *Raft) getCurrentTerm() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.currentTerm
+	return rf.state.CurrentTerm
 }
 
 func (rf *Raft) setVotedFor(votedFor int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.state.votedFor = votedFor
+	rf.state.VotedFor = votedFor
 }
 
 func (rf *Raft) getLeaderInfo() (int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	isLeader := rf.state.role == LEADER
+	isLeader := rf.state.Role == LEADER
 	var leaderId int
 	if isLeader {
 		leaderId = rf.me
@@ -85,16 +85,17 @@ func (rf *Raft) isCandidate() bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.role == CANDIDATE
+	return rf.state.Role == CANDIDATE
 }
 
 func (rf *Raft) setState(role Role, term int, votedFor int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.state.role = role
-	rf.state.currentTerm = term
-	rf.state.votedFor = votedFor
+	rf.state.Role = role
+	rf.state.CurrentTerm = term
+	rf.state.VotedFor = votedFor
+	rf.persist()
 }
 
 // volatile state on all servers
@@ -128,6 +129,13 @@ func (rf *Raft) initializePeerIndexState() {
 	}
 }
 
+func (rf *Raft) getMatchIndexForPeer(server int) int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.peerIndexState.matchIndex[server]
+}
+
 func (rf *Raft) setMatchIndexForPeer(server int, index int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -149,18 +157,6 @@ func (rf *Raft) setNextIndexForPeer(server int, index int) {
 	rf.peerIndexState.nextIndex[server] = index
 }
 
-func (rf *Raft) getMajorityIndex() int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	matchIndices := append([]int(nil), rf.peerIndexState.matchIndex...)
-
-	sort.Ints(matchIndices)
-	majorityIndex := matchIndices[(len(matchIndices)-1)/2]
-
-	return majorityIndex
-}
-
 // ---------------------
 // RPC Utils
 // ---------------------
@@ -172,10 +168,4 @@ func (rf *Raft) buildHeartBeatArgs(server int) *AppendEntriesArgs {
 		currentTerm, rf.me, []LogEntry{}, prevLogIndex, prevLogTerm, leaderCommitIndex}
 
 	return &appendEntriesArgs
-}
-
-func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
-	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
-
-	return ok
 }

@@ -90,37 +90,37 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	rf.lastCommTime = time.Now()
 
-	Debug(dVote, "Server %d received request vote, current votedFor %d\n", rf.me, rf.state.votedFor)
+	Debug(dVote, "Server %d received request vote, current votedFor %d\n", rf.me, rf.state.VotedFor)
 	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
 	reply.VoteGranted = false
 	// requester's term is smaller than current peer's term
-	if requestTerm < rf.state.currentTerm {
-		reply.Term = rf.state.currentTerm
+	if requestTerm < rf.state.CurrentTerm {
+		reply.Term = rf.state.CurrentTerm
 		return
 	}
 
 	// requester's term is greater than current peer's term, convert current peer to follower
-	if requestTerm > rf.state.currentTerm {
+	if requestTerm > rf.state.CurrentTerm {
 		Debug(dVote, "Server %d's term is lower than server %d's term %d\n", rf.me, candidateId, requestTerm)
-		rf.state.currentTerm = requestTerm
-		rf.state.role = FOLLOWER
-		rf.state.votedFor = -1
+		rf.state.CurrentTerm = requestTerm
+		rf.state.Role = FOLLOWER
+		rf.state.VotedFor = -1
 	}
 
 	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
 		Debug(dVote, "Server %d's log/term is more up-to-date than candidate %d's\n", rf.me, candidateId)
-		reply.Term = rf.state.currentTerm
+		reply.Term = rf.state.CurrentTerm
 		reply.VoteGranted = false
 		return
 	}
 
 	// vote for requester
-	if rf.state.votedFor == -1 {
-		rf.state.votedFor = args.CandidateId
-		rf.state.currentTerm = args.Term
+	if rf.state.VotedFor == -1 || rf.state.VotedFor == candidateId {
+		rf.state.VotedFor = candidateId
+		rf.state.CurrentTerm = requestTerm
 		reply.VoteGranted = true
 		reply.Term = requestTerm
-		Debug(dVote, "Server %d votedFor server %d\n", rf.me, args.CandidateId)
+		Debug(dVote, "Server %d votedFor server %d\n", rf.me, candidateId)
 		return
 	}
 }
