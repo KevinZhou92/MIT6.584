@@ -247,10 +247,10 @@ func (rf *Raft) ticker() {
 func (rf *Raft) runApplier() {
 	Debug(dInfo, "Server %d started applier", rf.me)
 	for !rf.killed() {
-		commitIndex := rf.getServerCommitIndex()
+		serverCommitIndex := rf.getServerCommitIndex()
 		lastAppliedIndex := rf.getServerAppliedIndex()
-		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, commitIndex, lastAppliedIndex)
-		for curIndex := lastAppliedIndex + 1; curIndex <= commitIndex; curIndex += 1 {
+		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, serverCommitIndex, lastAppliedIndex)
+		for curIndex := lastAppliedIndex + 1; curIndex <= serverCommitIndex; curIndex += 1 {
 			Debug(dCommit, "Server %d get index %d command, log count %d", rf.me, curIndex, rf.getLogSize())
 			cmd := rf.getLogEntry(curIndex).Command
 			applyMsg := ApplyMsg{true, cmd, curIndex, false, nil, -1, -1}
