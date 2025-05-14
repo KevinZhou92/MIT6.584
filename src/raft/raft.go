@@ -21,6 +21,7 @@ import (
 	//	"bytes"
 
 	"bytes"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -64,6 +65,10 @@ type State struct {
 	Role        Role
 	CurrentTerm int
 	VotedFor    int // index of the candidate that this peer voted for
+}
+
+func (state *State) String() string {
+	return fmt.Sprintf("State: role: %s, CurrentTerm: %d, VotedFor: %d", roleMap[state.Role], state.CurrentTerm, state.VotedFor)
 }
 
 // A go object recording the index state for the logs
@@ -192,30 +197,14 @@ func (rf *Raft) appendLogLocally(logEntry LogEntry) int {
 	defer rf.mu.Unlock()
 
 	rf.logs = append(rf.logs, logEntry)
+	rf.persist()
+
 	rf.peerIndexState.nextIndex[rf.me] = len(rf.logs)
 	rf.peerIndexState.matchIndex[rf.me] = len(rf.logs) - 1
 	Debug(dLog, "Server %d appended log %v", rf.me, logEntry)
+	// Debug(dLog, "Server %d logs %v", rf.me, rf.logs)
 
 	return len(rf.logs) - 1
-}
-
-func (rf *Raft) sendHeartbeat() {
-	for !rf.killed() {
-		time.Sleep(time.Duration(50) * time.Millisecond)
-
-		if _, isLeader := rf.getLeaderInfo(); !isLeader {
-			continue
-		}
-
-		for server := range rf.peers {
-			if server == rf.me {
-				continue
-			}
-
-			go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
-		}
-		// Debug(dInfo, "Server %d sent heartbeat to followers", rf.me)
-	}
 }
 
 // the tester doesn't halt goroutines created by Raft after each test,
@@ -243,7 +232,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
-		timeout := (50 + time.Duration(rand.Int63()%300)) * time.Millisecond
+		timeout := (200 + time.Duration(rand.Int63()%300)) * time.Millisecond
 		time.Sleep(timeout)
 		// Debug(dLog, "Server %d is %s", rf.me, roleMap[rf.state.role])
 		// Debug(dTerm, "Server %d term is %d", rf.me, rf.state.currentTerm)
@@ -258,10 +247,10 @@ func (rf *Raft) ticker() {
 func (rf *Raft) runApplier() {
 	Debug(dInfo, "Server %d started applier", rf.me)
 	for !rf.killed() {
-		commitIndex := rf.getServerCommitIndex()
+		serverCommitIndex := rf.getServerCommitIndex()
 		lastAppliedIndex := rf.getServerAppliedIndex()
-		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, commitIndex, lastAppliedIndex)
-		for curIndex := lastAppliedIndex + 1; curIndex <= commitIndex; curIndex += 1 {
+		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, serverCommitIndex, lastAppliedIndex)
+		for curIndex := lastAppliedIndex + 1; curIndex <= serverCommitIndex; curIndex += 1 {
 			Debug(dCommit, "Server %d get index %d command, log count %d", rf.me, curIndex, rf.getLogSize())
 			cmd := rf.getLogEntry(curIndex).Command
 			applyMsg := ApplyMsg{true, cmd, curIndex, false, nil, -1, -1}
@@ -297,16 +286,24 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	}
 	rf.logState = &LogState{len(rf.logs) - 1, 0}
 	rf.applyCh = applyCh
-	rf.initializePeerIndexState()
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
+	Debug(dInfo, "Server %d started with state %v, logs: %v", rf.me, rf.state, rf.logs)
+
+	rf.initializePeerIndexState()
+	Debug(dInfo, "Server %d started with PeerIndexState %v", rf.me, rf.peerIndexState)
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
 
 	// start heatbeat goroutine to start elections
 	go rf.sendHeartbeat()
+
+	// start log replicator if raft peer is a leader
+	if rf.isLeader() {
+		rf.startLeaderProcesses()
+	}
 
 	// Apply committed message on each peer
 	go rf.runApplier()

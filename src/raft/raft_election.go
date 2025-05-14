@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -15,6 +16,11 @@ type RequestVoteArgs struct {
 	LastLogTerm  int
 }
 
+func (args RequestVoteArgs) String() string {
+	return fmt.Sprintf("RequestVoteArgs{Term: %d, CandidateId: %d, LastLogIndex: %d, LastLogTerm: %d}",
+		args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm)
+}
+
 // example RequestVote RPC reply structure.
 // field names must start with capital letters!
 type RequestVoteReply struct {
@@ -25,7 +31,7 @@ type RequestVoteReply struct {
 
 func (rf *Raft) election() {
 	Debug(dVote, "Server %d started election, current term %d", rf.me, rf.getCurrentTerm())
-	ms := 50 + (rand.Int63() % 300)
+	ms := 200 + (rand.Int63() % 100)
 	deadline := time.After(time.Duration(ms) * time.Millisecond)
 
 	resultCh := make(chan RequestVoteReply, len(rf.peers))
@@ -52,34 +58,38 @@ func (rf *Raft) election() {
 			}
 			// Found a peer with a greater term, this peer can't become the leader anymore, stop the leader election
 			if reply.Term > currentTerm {
-				Debug(dVote, "Server %d's term %d is lower than peers", rf.me, currentTerm)
+				Debug(dVote, "Server %d's term %d is lower than peer's term %d", rf.me, currentTerm, reply.Term)
 				rf.setState(FOLLOWER, reply.Term, -1)
 				return
 			}
 			collected += 1
 			// Elected as leader
 			if votes > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d has %d votes. Server %d is leader now\n", rf.me, votes, rf.me)
+				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, currentTerm)
 				rf.setState(LEADER, currentTerm, rf.me)
 				rf.initializePeerIndexState()
-				for server := range rf.peers {
-					if server == rf.me {
-						continue
-					}
-
-					go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
-					go rf.runLogReplicator(server)
-				}
-				go rf.runReplicaCounter()
+				rf.startLeaderProcesses()
 
 				return
 			}
 		case <-deadline:
-			Debug(dInfo, "Server %d nothing happened during election. Waiting for new election\n", rf.me)
-			rf.setVotedFor(-1)
+			Debug(dInfo, "Server %d nothing happened during election for term %d. Waiting for new election\n", rf.me, currentTerm)
+			rf.setState(CANDIDATE, currentTerm, -1)
 			return
 		}
 	}
+}
+
+func (rf *Raft) startLeaderProcesses() {
+	for server := range rf.peers {
+		if server == rf.me {
+			continue
+		}
+
+		go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
+		go rf.runLogReplicator(server)
+	}
+	go rf.runReplicaCounter()
 }
 
 // example RequestVote RPC handler.
@@ -90,7 +100,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	rf.lastCommTime = time.Now()
 
-	Debug(dVote, "Server %d received request vote, current votedFor %d\n", rf.me, rf.state.VotedFor)
+	Debug(dVote, "Server %d received request vote %v, current votedFor %d\n", rf.me, args, rf.state.VotedFor)
 	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
 	reply.VoteGranted = false
 	// requester's term is smaller than current peer's term
@@ -101,14 +111,16 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// requester's term is greater than current peer's term, convert current peer to follower
 	if requestTerm > rf.state.CurrentTerm {
-		Debug(dVote, "Server %d's term is lower than server %d's term %d\n", rf.me, candidateId, requestTerm)
+		Debug(dVote, "Server %d's term %d is lower than server %d's term %d\n", rf.me, rf.state.CurrentTerm, candidateId, requestTerm)
 		rf.state.CurrentTerm = requestTerm
 		rf.state.Role = FOLLOWER
 		rf.state.VotedFor = -1
+		rf.persist()
 	}
 
 	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
-		Debug(dVote, "Server %d's log/term is more up-to-date than candidate %d's\n", rf.me, candidateId)
+		Debug(dVote, "Server %d's lastLogIndex %d and lastLogTerm %d is more up-to-date than candidate %d's lastLogIndex %d and lastLogTerm %d\n",
+			rf.me, len(rf.logs)-1, rf.logs[len(rf.logs)-1].Term, candidateId, lastLogIndex, lastLogTerm)
 		reply.Term = rf.state.CurrentTerm
 		reply.VoteGranted = false
 		return
@@ -120,6 +132,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.state.CurrentTerm = requestTerm
 		reply.VoteGranted = true
 		reply.Term = requestTerm
+		rf.persist()
 		Debug(dVote, "Server %d votedFor server %d\n", rf.me, candidateId)
 		return
 	}
