@@ -1,9 +1,14 @@
 package raft
 
 import (
-	"sort"
 	"time"
 )
+
+var roleMap = map[Role]string{
+	LEADER:    "Leader",
+	CANDIDATE: "Candidate",
+	FOLLOWER:  "Follower",
+}
 
 func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 	rf.mu.Lock()
@@ -19,13 +24,6 @@ func (rf *Raft) getCurrentTerm() int {
 	defer rf.mu.Unlock()
 
 	return rf.state.CurrentTerm
-}
-
-func (rf *Raft) setVotedFor(votedFor int) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.state.VotedFor = votedFor
 }
 
 func (rf *Raft) getLeaderInfo() (int, bool) {
@@ -49,8 +47,8 @@ func (rf *Raft) getPrevLogInfo(server int) (int, int) {
 
 	prevLogIndex := rf.peerIndexState.nextIndex[server] - 1
 	prevLogTerm := rf.logs[prevLogIndex].Term
-	return prevLogIndex, prevLogTerm
 
+	return prevLogIndex, prevLogTerm
 }
 
 func (rf *Raft) getServerCommitIndex() int {
@@ -88,6 +86,20 @@ func (rf *Raft) isCandidate() bool {
 	return rf.state.Role == CANDIDATE
 }
 
+func (rf *Raft) isLeader() bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.state.Role == LEADER
+}
+
+func (rf *Raft) GetRole() Role {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.state.Role
+}
+
 func (rf *Raft) setState(role Role, term int, votedFor int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -106,11 +118,25 @@ func (rf *Raft) getLogEntry(logIndex int) LogEntry {
 	return rf.logs[logIndex]
 }
 
+func (rf *Raft) getLogEntriesFromIndex(logIndex int) []LogEntry {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.logs[logIndex:]
+}
+
 func (rf *Raft) getLogSize() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	return len(rf.logs)
+}
+
+func (rf *Raft) getLastLogTerm() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.logs[len(rf.logs)-1].Term
 }
 
 // volatile state on all servers
@@ -155,17 +181,4 @@ func (rf *Raft) setNextIndexForPeer(server int, index int) {
 	defer rf.mu.Unlock()
 
 	rf.peerIndexState.nextIndex[server] = index
-}
-
-// ---------------------
-// RPC Utils
-// ---------------------
-func (rf *Raft) buildHeartBeatArgs(server int) *AppendEntriesArgs {
-	currentTerm := rf.getCurrentTerm()
-	prevLogIndex, prevLogTerm := rf.getPrevLogInfo(server)
-	leaderCommitIndex := rf.getServerCommitIndex()
-	appendEntriesArgs := AppendEntriesArgs{
-		currentTerm, rf.me, []LogEntry{}, prevLogIndex, prevLogTerm, leaderCommitIndex}
-
-	return &appendEntriesArgs
 }

@@ -35,6 +35,13 @@ type AppendEntriesReply struct {
 	// Conflict Info
 	ConflictEntryIndex int
 	ConflictEntryTerm  int
+	PeerLogSize        int
+}
+
+func (args AppendEntriesReply) String() string {
+	return fmt.Sprintf(
+		"AppendEntriesReply{Term: %d, Success: %t, ConflictEntryIndex: %d, ConflictEntryTerm: %d, PeerLogSize: %d}",
+		args.Term, args.Success, args.ConflictEntryIndex, args.ConflictEntryTerm, args.PeerLogSize)
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -48,11 +55,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.lastCommTime = time.Now()
-
 	// could be a heartbeat message from a leader
 	if len(args.Entries) == 0 {
-		Debug(dInfo, "Server %d received heartbeat from leader id %d with args %v\n", rf.me, args.LeaderId, args)
+		Debug(dInfo, "Server %d(term: %d) received heartbeat from leader id %d with args %v\n", rf.me, rf.state.CurrentTerm, args.LeaderId, args)
+	} else {
+		Debug(dInfo, "Server %d(term: %d) received logs from leader id %d with args %v\n", rf.me, rf.state.CurrentTerm, args.LeaderId, args)
 	}
 
 	// not a heart beat message, processing logs from append entries request
@@ -61,6 +68,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Term = reqTerm
 	reply.ConflictEntryIndex = -1
 	reply.ConflictEntryTerm = -1
+	reply.PeerLogSize = len(rf.logs)
 
 	// leaderId := args.LeaderId
 	entries := args.Entries
@@ -76,10 +84,15 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// reply false if term < current term
 	if reqTerm < rf.state.CurrentTerm {
-		Debug(dWarn, "Server %d's term is greater than %d's term %d\n", rf.me, args.LeaderId, reqTerm)
+		Debug(dWarn, "Server %d's term %d is greater than %d's term %d\n", rf.me, rf.state.CurrentTerm, args.LeaderId, reqTerm)
 		reply.Term = rf.state.CurrentTerm
+		rf.persist()
+
 		return
 	}
+
+	// only update the last communication time if we received a heartbeat from a current leader(which carries a term which is at least larger than peer's)
+	rf.lastCommTime = time.Now()
 
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
 	if prevLogIndex >= len(rf.logs) || (prevLogIndex > 0 && rf.logs[prevLogIndex].Term != prevLogTerm) {
@@ -89,25 +102,41 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			index -= 1
 		}
 
-		if 0 < index && index < len(rf.logs) {
+		if 0 <= index && index < len(rf.logs) {
 			reply.ConflictEntryIndex = index + 1
 			reply.ConflictEntryTerm = rf.logs[index+1].Term
 		}
 
+		rf.persist()
+
 		return
 	}
-
-	Debug(dLog, "Server %d received a log %s\n", rf.me, args)
 
 	// Truncate log if prevLogIndex is not the last log in current peer's log.This could happen during a split brain scenario.
 	// Note that we should not truncte committed log as once log is committed it it durable
 	if len(entries) != 0 {
+		Debug(dLog, "Server %d received log entries %s\n", rf.me, args)
 		if prevLogIndex >= rf.logState.commitIndex && prevLogIndex+1 <= len(rf.logs) {
+			Debug(dPersist, "Server %d log length before append: %d", rf.me, len(rf.logs))
 			rf.logs = rf.logs[:prevLogIndex+1]
 			Debug(dLog, "Server %d truncated its log to index %d", rf.me, prevLogIndex)
 		}
 
-		rf.logs = append(rf.logs, entries...)
+		// If there were retries for a request, we just do an idempotenet operation here, we are put the entry
+		// at the same index it was supposed to be at. For example, if prevLogIndex was 5, then the first entry in the
+		// input should be at index 6. Note that we already made sure the prevLogTerm matches with the log entry's term
+		// at prevLogIndex
+		idx := prevLogIndex + 1
+		for idx < len(rf.logs) && idx-prevLogIndex-1 < len(entries) {
+			rf.logs[idx] = entries[idx-prevLogIndex-1]
+			idx += 1
+		}
+		// append new logs
+		if idx-prevLogIndex-1 < len(entries) {
+			rf.logs = append(rf.logs, entries[idx-prevLogIndex-1:]...)
+		}
+
+		Debug(dPersist, "Server %d log length after append: %d", rf.me, len(rf.logs))
 		Debug(dLog, "Server %d append entries in log\n", rf.me)
 	}
 
@@ -136,7 +165,9 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.logState.commitIndex = newCommitIndex
 	}
 
-	Debug(dLog, "Server %d logs: %v\n", rf.me, rf.logs)
+	Debug(dLog, "Server %d log size: %d lastLogTerm: %d, logs: %v\n", rf.me, len(rf.logs), rf.logs[len(rf.logs)-1].Term, rf.logs)
+	rf.persist()
+
 	reply.Term = rf.state.CurrentTerm
 	reply.Success = true
 }
@@ -164,7 +195,7 @@ func (rf *Raft) runReplicaCounter() {
 			}
 
 			if count > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d commits log %d (term=%d)", rf.me, curIdx, entry.Term)
+				Debug(dLeader, "Server %d replicate log to majority, commits log %d (term=%d)", rf.me, curIdx, entry.Term)
 				rf.setServerCommitIndex(curIdx)
 			}
 		}
@@ -175,12 +206,16 @@ func (rf *Raft) runReplicaCounter() {
 
 func (rf *Raft) runLogReplicator(server int) {
 	Debug(dLeader, "Server %d started log replicator for server %d\n", rf.me, server)
+	// This boolean indicates if the prev append entry call is successful, if yes, we will
+	// send log entries in batch in the following request, this case we can avoid always sending
+	// all the remaining logs thus save some bandwidth
+	prevSuccess := false
 	for !rf.killed() {
-		Debug(dLeader, "Server %d try to replicate log to server %d", rf.me, server)
 		// Stop log replicator is current peer is not leader anymore
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
 			return
 		}
+		Debug(dLeader, "Server %d has %d logs with lastLogTerm: %d", rf.me, rf.getLogSize(), rf.getLastLogTerm())
 
 		currentTerm := rf.getCurrentTerm()
 		leaderCommitIndex := rf.getServerCommitIndex()
@@ -195,13 +230,17 @@ func (rf *Raft) runLogReplicator(server int) {
 			continue
 		}
 
-		logEntry := rf.getLogEntry(nextIndex)
-		appendEntriesArgs := AppendEntriesArgs{currentTerm, rf.me, []LogEntry{logEntry}, prevLogIndex, prevLogTerm, leaderCommitIndex}
+		logEntries := rf.getLogEntriesFromIndex(nextIndex)
+		if !prevSuccess {
+			logEntries = []LogEntry{rf.getLogEntry(nextIndex)}
+		}
+		appendEntriesArgs := AppendEntriesArgs{currentTerm, rf.me, logEntries, prevLogIndex, prevLogTerm, leaderCommitIndex}
 		appendEntriesReply := AppendEntriesReply{}
 
+		Debug(dLeader, "Server %d try to replicate log %v to server %d", rf.me, appendEntriesArgs, server)
 		ok := rf.sendAppendEntries(server, &appendEntriesArgs, &appendEntriesReply)
 		if !ok {
-			Debug(dLog, "Server %d rpc call to server %d failed", rf.me, server)
+			Debug(dLog, "Server %d rpc call to server %d failed, current server role is %s", rf.me, server, roleMap[rf.GetRole()])
 			continue
 		}
 
@@ -214,7 +253,7 @@ func (rf *Raft) runLogReplicator(server int) {
 
 		// Couldn't replicate message, log mismatch found from peer, reduce nextIndex and retry
 		if !appendEntriesReply.Success {
-			Debug(dWarn, "Server %d couldn't replicate log to server %d, reduce nextIndex to %d", rf.me, server, nextIndex-1)
+			Debug(dWarn, "Server %d couldn't replicate log to server %d, response %v", rf.me, server, appendEntriesReply)
 			if appendEntriesReply.ConflictEntryTerm != -1 {
 				conflictEntryIndex, conflictEntryTerm := appendEntriesReply.ConflictEntryIndex, appendEntriesReply.ConflictEntryTerm
 				curIdx := rf.getLogSize() - 1
@@ -227,16 +266,23 @@ func (rf *Raft) runLogReplicator(server int) {
 				} else {
 					rf.setNextIndexForPeer(server, conflictEntryIndex)
 				}
-
 			} else {
 				rf.setNextIndexForPeer(server, nextIndex-1)
 			}
+
+			if rf.getNextIndexForPeer(server)-1 >= appendEntriesReply.PeerLogSize {
+				rf.setNextIndexForPeer(server, appendEntriesReply.PeerLogSize)
+			}
+			Debug(dWarn, "Server %d couldn't replicate log to server %d, reduce nextIndex to %d", rf.me, server, rf.getNextIndexForPeer(server))
+			prevSuccess = false
 			continue
 		}
 
 		// Message replication succeeded, update nextIndex and matchIndex
-		Debug(dCommit, "Server %d replicated log %d to server %d, update next index to %d", rf.me, nextIndex, server, nextIndex+1)
-		rf.setMatchIndexForPeer(server, nextIndex)
-		rf.setNextIndexForPeer(server, nextIndex+1)
+		// note that we are sending message in batch so we need to update nextIndex and matchIndex correspondingly
+		Debug(dCommit, "Server %d replicated log %d to server %d, update next index to %d", rf.me, nextIndex+len(logEntries), server, nextIndex+1)
+		rf.setMatchIndexForPeer(server, nextIndex+len(logEntries)-1)
+		rf.setNextIndexForPeer(server, nextIndex+len(logEntries))
+		prevSuccess = true
 	}
 }
