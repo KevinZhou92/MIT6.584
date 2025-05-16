@@ -29,9 +29,18 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
+func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	curTime := time.Now()
+
+	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.state.Role == FOLLOWER || rf.state.Role == CANDIDATE)
+}
+
 func (rf *Raft) election() {
-	Debug(dVote, "Server %d started election, current term %d", rf.me, rf.getCurrentTerm())
-	ms := 200 + (rand.Int63() % 100)
+	Debug(dVote, "Server %d started election, current term %d, current role %s", rf.me, rf.getCurrentTerm(), roleMap[rf.GetRole()])
+	ms := 300 + (rand.Int63() % 300)
 	deadline := time.After(time.Duration(ms) * time.Millisecond)
 
 	resultCh := make(chan RequestVoteReply, len(rf.peers))
@@ -46,7 +55,6 @@ func (rf *Raft) election() {
 		go rf.getVote(resultCh, idx)
 	}
 
-	currentTerm := rf.getCurrentTerm()
 	votes := 1
 	collected := 1
 	for collected < len(rf.peers) {
@@ -57,24 +65,23 @@ func (rf *Raft) election() {
 				Debug(dVote, "Server %d received a vote, current vote %d\n", rf.me, votes)
 			}
 			// Found a peer with a greater term, this peer can't become the leader anymore, stop the leader election
-			if reply.Term > currentTerm {
-				Debug(dVote, "Server %d's term %d is lower than peer's term %d", rf.me, currentTerm, reply.Term)
+			if reply.Term > rf.getCurrentTerm() {
+				Debug(dVote, "Server %d's term %d is lower than peer's term %d", rf.me, rf.getCurrentTerm(), reply.Term)
 				rf.setState(FOLLOWER, reply.Term, -1)
 				return
 			}
 			collected += 1
 			// Elected as leader
 			if votes > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, currentTerm)
-				rf.setState(LEADER, currentTerm, rf.me)
+				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, rf.getCurrentTerm())
+				rf.setState(LEADER, rf.getCurrentTerm(), rf.me)
 				rf.initializePeerIndexState()
 				rf.startLeaderProcesses()
 
 				return
 			}
 		case <-deadline:
-			Debug(dInfo, "Server %d nothing happened during election for term %d. Waiting for new election\n", rf.me, currentTerm)
-			rf.setState(CANDIDATE, currentTerm, -1)
+			Debug(dInfo, "Server %d nothing happened during election for term %d. Waiting for new election\n", rf.me, rf.getCurrentTerm())
 			return
 		}
 	}
@@ -140,7 +147,12 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 func (rf *Raft) getVote(resultChan chan RequestVoteReply, server int) {
 	lastLogIndex := rf.getLogSize() - 1
-	lastLogTerm := rf.getLogEntry(lastLogIndex).Term
+	lastLogEntry, err := rf.getLogEntry(lastLogIndex)
+	if err != nil {
+		Debug(dError, "Server %d can't get log from lastLogIndex %d, log size: %d, give up get Vote", rf.me, lastLogIndex, rf.getLogSize())
+		return
+	}
+	lastLogTerm := lastLogEntry.Term
 	currentTerm := rf.getCurrentTerm()
 
 	requestVoteArgs := RequestVoteArgs{currentTerm, rf.me, lastLogIndex, lastLogTerm}

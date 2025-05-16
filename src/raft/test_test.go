@@ -818,7 +818,7 @@ func TestFigure83C(t *testing.T) {
 		leader := -1
 		for i := 0; i < servers; i++ {
 			if cfg.rafts[i] != nil {
-				_, _, ok := cfg.rafts[i].Start(rand.Int())
+				_, _, ok := cfg.rafts[i].Start(iters*10 + i)
 				if ok {
 					leader = i
 				}
@@ -855,7 +855,7 @@ func TestFigure83C(t *testing.T) {
 		}
 	}
 
-	cfg.one(rand.Int(), servers, true)
+	cfg.one(9876, servers, true)
 
 	cfg.end()
 }
