@@ -76,17 +76,17 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	prevLogTerm := args.PrevLogTerm
 	leaderCommitIndex := args.LeaderCommit
 
-	if reqTerm >= rf.state.CurrentTerm {
+	if reqTerm > rf.state.CurrentTerm {
 		rf.state.VotedFor = -1
 		rf.state.Role = FOLLOWER
 		rf.state.CurrentTerm = args.Term
+		rf.persist()
 	}
 
 	// reply false if term < current term
 	if reqTerm < rf.state.CurrentTerm {
 		Debug(dWarn, "Server %d's term %d is greater than %d's term %d\n", rf.me, rf.state.CurrentTerm, args.LeaderId, reqTerm)
 		reply.Term = rf.state.CurrentTerm
-		rf.persist()
 
 		return
 	}
@@ -106,8 +106,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			reply.ConflictEntryIndex = index + 1
 			reply.ConflictEntryTerm = rf.logs[index+1].Term
 		}
-
-		rf.persist()
 
 		return
 	}
@@ -182,8 +180,8 @@ func (rf *Raft) runReplicaCounter() {
 		lastLogIndex := rf.getLogSize() - 1
 
 		for curIdx := rf.getServerCommitIndex() + 1; curIdx <= lastLogIndex; curIdx++ {
-			entry := rf.getLogEntry(curIdx)
-			if entry.Term != currentTerm {
+			entry, err := rf.getLogEntry(curIdx)
+			if err != nil || entry.Term != currentTerm {
 				continue // Raft can't commit logs from previous term
 			}
 
@@ -219,9 +217,14 @@ func (rf *Raft) runLogReplicator(server int) {
 
 		currentTerm := rf.getCurrentTerm()
 		leaderCommitIndex := rf.getServerCommitIndex()
-		nextIndex := rf.getNextIndexForPeer(server)
+		nextIndex := min(rf.getLogSize(), rf.getNextIndexForPeer(server))
 		prevLogIndex := nextIndex - 1
-		prevLog := rf.getLogEntry(prevLogIndex)
+		prevLog, err := rf.getLogEntry(prevLogIndex)
+		if err != nil {
+			Debug(dError, "Server %d has less logs for server %d, log size: %d, reduce nextIndex to logsize", rf.me, server, rf.getLogSize())
+			rf.setNextIndexForPeer(server, rf.getLogSize())
+			continue
+		}
 		prevLogTerm := prevLog.Term
 
 		if nextIndex >= rf.getLogSize() {
@@ -230,10 +233,17 @@ func (rf *Raft) runLogReplicator(server int) {
 			continue
 		}
 
-		logEntries := rf.getLogEntriesFromIndex(nextIndex)
-		if !prevSuccess {
-			logEntries = []LogEntry{rf.getLogEntry(nextIndex)}
+		logEntries, err := rf.getLogEntriesFromIndex(nextIndex)
+		if err != nil {
+			Debug(dError, "Server %d has less logs for server %d, log size: %d, reduce nextIndex to logsize", rf.me, server, rf.getLogSize())
+			rf.setNextIndexForPeer(server, rf.getLogSize())
+			continue
 		}
+
+		if !prevSuccess {
+			logEntries = []LogEntry{logEntries[0]}
+		}
+
 		appendEntriesArgs := AppendEntriesArgs{currentTerm, rf.me, logEntries, prevLogIndex, prevLogTerm, leaderCommitIndex}
 		appendEntriesReply := AppendEntriesReply{}
 
@@ -257,7 +267,16 @@ func (rf *Raft) runLogReplicator(server int) {
 			if appendEntriesReply.ConflictEntryTerm != -1 {
 				conflictEntryIndex, conflictEntryTerm := appendEntriesReply.ConflictEntryIndex, appendEntriesReply.ConflictEntryTerm
 				curIdx := rf.getLogSize() - 1
-				for curIdx >= 0 && rf.getLogEntry(curIdx).Term != conflictEntryTerm {
+				for curIdx >= 0 {
+					entry, err := rf.getLogEntry(curIdx)
+					if err != nil {
+						// Defensive fallback: log entry unexpectedly not found
+						Debug(dError, "Server %d failed to get log entry at index %d: %v", rf.me, curIdx, err)
+						break
+					}
+					if entry.Term == conflictEntryTerm {
+						break
+					}
 					curIdx -= 1
 				}
 
@@ -270,7 +289,7 @@ func (rf *Raft) runLogReplicator(server int) {
 				rf.setNextIndexForPeer(server, nextIndex-1)
 			}
 
-			if rf.getNextIndexForPeer(server)-1 >= appendEntriesReply.PeerLogSize {
+			if rf.getNextIndexForPeer(server) >= appendEntriesReply.PeerLogSize {
 				rf.setNextIndexForPeer(server, appendEntriesReply.PeerLogSize)
 			}
 			Debug(dWarn, "Server %d couldn't replicate log to server %d, reduce nextIndex to %d", rf.me, server, rf.getNextIndexForPeer(server))

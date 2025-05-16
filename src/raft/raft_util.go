@@ -1,8 +1,6 @@
 package raft
 
-import (
-	"time"
-)
+import "errors"
 
 var roleMap = map[Role]string{
 	LEADER:    "Leader",
@@ -10,20 +8,20 @@ var roleMap = map[Role]string{
 	FOLLOWER:  "Follower",
 }
 
-func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	curTime := time.Now()
-
-	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.state.Role == FOLLOWER || rf.state.Role == CANDIDATE)
-}
+var EMPTY_LOG_ENTRY LogEntry = LogEntry{-1, -1}
 
 func (rf *Raft) getCurrentTerm() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
 	return rf.state.CurrentTerm
+}
+
+func (rf *Raft) getVotedFor() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return rf.state.VotedFor
 }
 
 func (rf *Raft) getLeaderInfo() (int, bool) {
@@ -111,18 +109,26 @@ func (rf *Raft) setState(role Role, term int, votedFor int) {
 }
 
 // volatile state on all servers
-func (rf *Raft) getLogEntry(logIndex int) LogEntry {
+func (rf *Raft) getLogEntry(logIndex int) (LogEntry, error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.logs[logIndex]
+	if logIndex < 0 || logIndex >= len(rf.logs) {
+		return EMPTY_LOG_ENTRY, errors.New("log index out of range")
+	}
+
+	return rf.logs[logIndex], nil
 }
 
-func (rf *Raft) getLogEntriesFromIndex(logIndex int) []LogEntry {
+func (rf *Raft) getLogEntriesFromIndex(logIndex int) ([]LogEntry, error) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.logs[logIndex:]
+	if logIndex < 0 || logIndex >= len(rf.logs) {
+		return []LogEntry{EMPTY_LOG_ENTRY}, errors.New("log index out of range")
+	}
+
+	return rf.logs[logIndex:], nil
 }
 
 func (rf *Raft) getLogSize() int {

@@ -98,8 +98,8 @@ type Raft struct {
 	lastCommTime time.Time
 
 	logs           []LogEntry
-	logState       *LogState
-	peerIndexState *PeerIndexState
+	logState       *LogState       // the commited log index and the applied log index, here applied means the result has been returned to client
+	peerIndexState *PeerIndexState // the next index and match index for each peer
 	applyCh        chan ApplyMsg
 }
 
@@ -201,8 +201,7 @@ func (rf *Raft) appendLogLocally(logEntry LogEntry) int {
 
 	rf.peerIndexState.nextIndex[rf.me] = len(rf.logs)
 	rf.peerIndexState.matchIndex[rf.me] = len(rf.logs) - 1
-	Debug(dLog, "Server %d appended log %v", rf.me, logEntry)
-	// Debug(dLog, "Server %d logs %v", rf.me, rf.logs)
+	Debug(dLog, "Server %d appended log %v and has log size %d", rf.me, logEntry, len(rf.logs))
 
 	return len(rf.logs) - 1
 }
@@ -232,7 +231,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
-		timeout := (200 + time.Duration(rand.Int63()%300)) * time.Millisecond
+		timeout := (300 + time.Duration(rand.Int63()%300)) * time.Millisecond
 		time.Sleep(timeout)
 		// Debug(dLog, "Server %d is %s", rf.me, roleMap[rf.state.role])
 		// Debug(dTerm, "Server %d term is %d", rf.me, rf.state.currentTerm)
@@ -251,8 +250,13 @@ func (rf *Raft) runApplier() {
 		lastAppliedIndex := rf.getServerAppliedIndex()
 		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, serverCommitIndex, lastAppliedIndex)
 		for curIndex := lastAppliedIndex + 1; curIndex <= serverCommitIndex; curIndex += 1 {
-			Debug(dCommit, "Server %d get index %d command, log count %d", rf.me, curIndex, rf.getLogSize())
-			cmd := rf.getLogEntry(curIndex).Command
+			Debug(dCommit, "Server %d get index %d command, log size %d", rf.me, curIndex, rf.getLogSize())
+			logEntry, err := rf.getLogEntry(curIndex)
+			if err != nil {
+				Debug(dError, "Server %d can't get index %d from log, log size %d", rf.me, curIndex, rf.getLogSize())
+				continue
+			}
+			cmd := logEntry.Command
 			applyMsg := ApplyMsg{true, cmd, curIndex, false, nil, -1, -1}
 			rf.applyCh <- applyMsg
 			rf.setServerAppliedIndex(curIndex)
