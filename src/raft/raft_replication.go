@@ -57,9 +57,9 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// could be a heartbeat message from a leader
 	if len(args.Entries) == 0 {
-		Debug(dInfo, "Server %d(term: %d) received heartbeat from leader id %d with args %v\n", rf.me, rf.state.CurrentTerm, args.LeaderId, args)
+		Debug(dInfo, "Server %d(term: %d) received heartbeat from leader id %d with args %v\n", rf.me, rf.electionState.CurrentTerm, args.LeaderId, args)
 	} else {
-		Debug(dInfo, "Server %d(term: %d) received logs from leader id %d with args %v\n", rf.me, rf.state.CurrentTerm, args.LeaderId, args)
+		Debug(dInfo, "Server %d(term: %d) received logs from leader id %d with args %v\n", rf.me, rf.electionState.CurrentTerm, args.LeaderId, args)
 	}
 
 	// not a heart beat message, processing logs from append entries request
@@ -76,17 +76,17 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	prevLogTerm := args.PrevLogTerm
 	leaderCommitIndex := args.LeaderCommit
 
-	if reqTerm > rf.state.CurrentTerm {
-		rf.state.VotedFor = -1
-		rf.state.Role = FOLLOWER
-		rf.state.CurrentTerm = args.Term
+	if reqTerm > rf.electionState.CurrentTerm {
+		rf.electionState.VotedFor = -1
+		rf.electionState.Role = FOLLOWER
+		rf.electionState.CurrentTerm = args.Term
 		rf.persist()
 	}
 
 	// reply false if term < current term
-	if reqTerm < rf.state.CurrentTerm {
-		Debug(dWarn, "Server %d's term %d is greater than %d's term %d\n", rf.me, rf.state.CurrentTerm, args.LeaderId, reqTerm)
-		reply.Term = rf.state.CurrentTerm
+	if reqTerm < rf.electionState.CurrentTerm {
+		Debug(dWarn, "Server %d's term %d is greater than %d's term %d\n", rf.me, rf.electionState.CurrentTerm, args.LeaderId, reqTerm)
+		reply.Term = rf.electionState.CurrentTerm
 
 		return
 	}
@@ -155,7 +155,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		// As a result, the old leader incorrectly considers its own log at index 4 (Term 2) as committed, violating Raft’s safety property.
 		// So we should just commit entry from current term
 		for i := rf.logState.commitIndex + 1; i <= min(leaderCommitIndex, len(rf.logs)-1); i++ {
-			if rf.logs[i].Term != rf.state.CurrentTerm {
+			if rf.logs[i].Term != rf.electionState.CurrentTerm {
 				continue
 			}
 			newCommitIndex = i
@@ -166,7 +166,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	Debug(dLog, "Server %d log size: %d lastLogTerm: %d, logs: %v\n", rf.me, len(rf.logs), rf.logs[len(rf.logs)-1].Term, rf.logs)
 	rf.persist()
 
-	reply.Term = rf.state.CurrentTerm
+	reply.Term = rf.electionState.CurrentTerm
 	reply.Success = true
 }
 
@@ -303,5 +303,30 @@ func (rf *Raft) runLogReplicator(server int) {
 		rf.setMatchIndexForPeer(server, nextIndex+len(logEntries)-1)
 		rf.setNextIndexForPeer(server, nextIndex+len(logEntries))
 		prevSuccess = true
+	}
+}
+
+// Apply log if the log has been replicated to majority of server
+func (rf *Raft) runApplier() {
+	Debug(dInfo, "Server %d started applier", rf.me)
+	for !rf.killed() {
+		serverCommitIndex := rf.getServerCommitIndex()
+		lastAppliedIndex := rf.getServerAppliedIndex()
+		Debug(dCommit, "Server %d commitIndex: %d, lastAppliedIndex: %d", rf.me, serverCommitIndex, lastAppliedIndex)
+		for curIndex := lastAppliedIndex + 1; curIndex <= serverCommitIndex; curIndex += 1 {
+			Debug(dCommit, "Server %d get index %d command, log size %d", rf.me, curIndex, rf.getLogSize())
+			logEntry, err := rf.getLogEntry(curIndex)
+			if err != nil {
+				Debug(dError, "Server %d can't get index %d from log, log size %d", rf.me, curIndex, rf.getLogSize())
+				continue
+			}
+			cmd := logEntry.Command
+			applyMsg := ApplyMsg{true, cmd, curIndex, false, nil, -1, -1}
+			Debug(dError, "Server %d sent a message!!", rf.me)
+			rf.applyCh <- applyMsg
+			rf.setServerAppliedIndex(curIndex)
+		}
+		time.Sleep(100 * time.Millisecond)
+		Debug(dInfo, "Server %d applied a message, lastAppliedIndex %d", rf.me, rf.getServerAppliedIndex())
 	}
 }

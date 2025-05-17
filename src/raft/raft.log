@@ -1,0 +1,503 @@
+000008 INFO Server 0 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+000011 INFO Server 0 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+000012 INFO Server 0 started with term 0
+000012 INFO Server 0 started applier
+000014 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+000017 INFO Server 1 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+000017 INFO Server 1 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+000018 INFO Server 1 started with term 0
+000018 INFO Server 1 started applier
+000018 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+000018 INFO Server 2 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+000019 INFO Server 2 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+000019 INFO Server 2 started with term 0
+000019 INFO Server 2 started applier
+000020 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+Test (3C): basic persistence ...
+000123 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000123 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000123 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000234 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000234 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000234 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000344 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000344 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000345 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000455 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000455 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000455 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000560 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000560 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000560 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000671 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000671 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000671 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000778 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+000779 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000779 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000889 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+000889 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+000889 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001000 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001000 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001000 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001016 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+001019 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+001020 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+001110 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001111 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001110 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001221 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001221 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001221 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001330 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001330 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001331 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001441 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001442 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001441 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001543 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001543 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001543 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001685 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001686 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001685 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+001928 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+001929 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+001929 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002027 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+002027 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+002027 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+002029 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002029 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002029 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002139 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002140 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002140 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002250 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002250 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002250 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002361 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002361 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002361 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002472 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002472 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002472 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002577 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002577 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002577 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002683 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002683 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002684 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002795 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002796 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+002795 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002907 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+002907 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+002907 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003019 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003019 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+003019 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003029 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+003029 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+003029 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+003130 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003130 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003131 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+003226 VOTE Server 2 started election, current term 1, current role Candidate
+003234 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+003234 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003235 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003237 VOTE Server 0 received request vote RequestVoteArgs{Term: 1, CandidateId: 2, LastLogIndex: 0, LastLogTerm: 0}, current votedFor -1
+003237 VOTE Server 0's term 0 is lower than server 2's term 1
+003237 VOTE Server 1 received request vote RequestVoteArgs{Term: 1, CandidateId: 2, LastLogIndex: 0, LastLogTerm: 0}, current votedFor -1
+003239 VOTE Server 1's term 0 is lower than server 2's term 1
+003241 VOTE Server 0 votedFor server 2
+003244 VOTE Server 1 votedFor server 2
+003246 VOTE Server 2 received a vote, current vote 2
+003246 LEAD Server 2 has 2 votes with term 1 and is LEADER now!
+003249 LEAD Server 2 started log replicator for server 1
+003249 LEAD Server 2 has 1 logs with lastLogTerm: 0
+003249 LEAD Server 2 has no logs to replicate for server 1
+003250 LEAD Server 2 started log replicator for server 0
+003250 LEAD Server 2 has 1 logs with lastLogTerm: 0
+003250 LEAD Server 2 has no logs to replicate for server 0
+003258 INFO Server 0(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+003260 LOG1 Server 0 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+003257 INFO Server 1(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+003261 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+003345 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+003345 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003345 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003451 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003451 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+003451 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003548 LOG1 Server 2 appended log {1 11} and has log size 2
+003551 INFO Server 0(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+003552 LOG1 Server 0 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+003552 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003554 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+003554 INFO Server 1(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+003555 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003555 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+003655 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003655 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+003655 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003759 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003760 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003761 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+003864 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+003864 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003864 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+003970 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+003970 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+003970 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+004037 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+004037 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+004038 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+004058 INFO Server 0(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+004058 INFO Server 1(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+004059 LOG1 Server 0 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+004060 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+004073 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+004073 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+004073 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+004177 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+004177 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+004177 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+004252 LEAD Server 2 has 2 logs with lastLogTerm: 1
+004252 LEAD Server 2 has 2 logs with lastLogTerm: 1
+004253 LEAD Server 2 try to replicate log AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]} to server 1
+004253 LEAD Server 2 try to replicate log AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]} to server 0
+004262 INFO Server 0(term: 1) received logs from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]}
+004262 INFO Server 1(term: 1) received logs from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]}
+004263 LOG1 Server 0 received log entries AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]}
+004264 PERS Server 0 log length before append: 1
+004263 LOG1 Server 1 received log entries AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 11}]}
+004264 LOG1 Server 0 truncated its log to index 0
+004264 PERS Server 1 log length before append: 1
+004264 PERS Server 0 log length after append: 2
+004264 LOG1 Server 1 truncated its log to index 0
+004264 LOG1 Server 0 append entries in log
+004265 PERS Server 1 log length after append: 2
+004265 LOG1 Server 1 append entries in log
+004265 LOG1 Server 1 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+004265 LOG1 Server 0 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+004273 CMIT Server 2 replicated log 2 to server 0, update next index to 2
+004273 CMIT Server 2 replicated log 2 to server 1, update next index to 2
+004273 LEAD Server 2 has 2 logs with lastLogTerm: 1
+004274 LEAD Server 2 has 2 logs with lastLogTerm: 1
+004274 LEAD Server 2 has no logs to replicate for server 0
+004274 LEAD Server 2 has no logs to replicate for server 1
+004278 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+004278 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+004279 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+004279 LEAD Server 2 replicate log to majority, commits log 1 (term=1)
+004388 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004388 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+004389 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+004499 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+004500 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004500 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+004560 INFO Server 0(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 1, PrevLogTerm: 1, LeaderCommit: 1, Entries: []}
+004560 INFO Server 1(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 1, PrevLogTerm: 1, LeaderCommit: 1, Entries: []}
+004562 WARN Server 0's commitIndex 0 is behind leader 2's commitIndex 1, server log count: 2
+004562 WARN Server 1's commitIndex 0 is behind leader 2's commitIndex 1, server log count: 2
+004562 LOG1 Server 0 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+004563 LOG1 Server 1 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+004601 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+004601 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004602 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+004711 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004711 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+004711 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+004813 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004814 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+004813 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+004925 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+004925 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+004924 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+005028 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+005028 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+005028 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+005040 CMIT Server 0 commitIndex: 1, lastAppliedIndex: 0
+005040 CMIT Server 1 commitIndex: 1, lastAppliedIndex: 0
+005040 CMIT Server 0 get index 1 command, log size 2
+005040 CMIT Server 1 get index 1 command, log size 2
+005040 CMIT Server 2 commitIndex: 1, lastAppliedIndex: 0
+005041 CMIT Server 2 get index 1 command, log size 2
+005060 INFO Server 0(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 1, PrevLogTerm: 1, LeaderCommit: 1, Entries: []}
+005061 INFO Server 1(term: 1) received heartbeat from leader id 2 with args AppendEntriesArgs{Term: 1, LeaderId: 2, PrevLogIndex: 1, PrevLogTerm: 1, LeaderCommit: 1, Entries: []}
+005061 LOG1 Server 0 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+005061 LOG1 Server 1 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 11}]
+005134 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+005134 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+005134 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+005215 ERRO Server 0 is unable to restore persist state
+005216 INFO Server 0 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+005217 INFO Server 0 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+005219 INFO Server 0 started with term 0
+005219 INFO Server 0 started applier
+005219 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+005221 ERRO Server 1 is unable to restore persist state
+005221 INFO Server 1 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+005222 INFO Server 1 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+005223 INFO Server 1 started with term 0
+005224 INFO Server 1 started applier
+005224 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+005225 ERRO Server 2 is unable to restore persist state
+005226 INFO Server 2 started with electionState: ElectionState: role: Follower, CurrentTerm: 0, VotedFor: -1, logs: [{0 0}], snapshotState: SnapshotState: LastIncludedIndex: -1, LastIncludedTerm: -1
+005226 INFO Server 2 started with PeerIndexState: &{[1 1 1] [0 0 0]}
+005227 INFO Server 2 started with term 0
+005227 INFO Server 2 started applier
+005228 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+005237 SNAP Server 2 started snapshot process with log size 2, commitIndex 1
+005237 SNAP Server 1 started snapshot process with log size 2, commitIndex 1
+005237 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+005324 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005324 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005328 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005431 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005431 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005431 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005542 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005543 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005543 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005654 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005654 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005655 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005758 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005758 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005758 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005862 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+005863 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005864 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005969 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+005969 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+005970 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006073 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006074 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006073 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006184 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006185 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006185 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006225 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+006225 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+006229 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+006293 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006292 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006293 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006405 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006405 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006404 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006516 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006516 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006517 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006628 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006628 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006628 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006735 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006736 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006735 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006848 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006848 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006848 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+006960 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+006960 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+006960 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007071 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007071 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007071 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007185 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007187 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007187 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007230 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+007230 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+007231 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+007293 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007293 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007293 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007398 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007398 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007398 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007508 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007508 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007508 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007618 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007618 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007618 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007729 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007730 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007731 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007841 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007841 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007841 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+007949 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+007949 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+007949 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008061 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008060 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008061 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008166 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008166 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008166 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008240 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+008240 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+008240 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+008270 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008271 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008271 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008381 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008382 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008382 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008493 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008493 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008493 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008605 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008604 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008605 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008716 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008716 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008717 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008827 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008827 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+008827 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008938 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+008938 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+008938 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009044 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009044 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009045 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009147 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009147 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009147 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009250 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+009250 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009250 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+009250 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+009251 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009251 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009362 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009362 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009362 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009468 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009468 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009468 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009579 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009579 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009579 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009686 SNAP Server 0 started snapshot process with log size 1, commitIndex 0
+009687 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009688 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009727 VOTE Server 0 started election, current term 1, current role Candidate
+009732 VOTE Server 2 received request vote RequestVoteArgs{Term: 1, CandidateId: 0, LastLogIndex: 0, LastLogTerm: 0}, current votedFor -1
+009732 VOTE Server 1 received request vote RequestVoteArgs{Term: 1, CandidateId: 0, LastLogIndex: 0, LastLogTerm: 0}, current votedFor -1
+009733 VOTE Server 2's term 0 is lower than server 0's term 1
+009733 VOTE Server 1's term 0 is lower than server 0's term 1
+009736 VOTE Server 2 votedFor server 0
+009737 VOTE Server 1 votedFor server 0
+009739 VOTE Server 0 received a vote, current vote 2
+009739 LEAD Server 0 has 2 votes with term 1 and is LEADER now!
+009741 LEAD Server 0 started log replicator for server 1
+009741 LEAD Server 0 started log replicator for server 2
+009742 LEAD Server 0 has 1 logs with lastLogTerm: 0
+009742 LEAD Server 0 has 1 logs with lastLogTerm: 0
+009742 LEAD Server 0 has no logs to replicate for server 1
+009742 LEAD Server 0 has no logs to replicate for server 2
+009745 INFO Server 1(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+009746 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+009746 INFO Server 2(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+009746 LOG1 Server 2 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+009756 LOG1 Server 0 appended log {1 12} and has log size 2
+009757 INFO Server 1(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+009758 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+009758 INFO Server 2(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+009758 LOG1 Server 2 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+009790 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+009790 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009790 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+009896 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+009896 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+009897 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010002 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010002 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010003 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010109 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010109 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010110 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010216 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010217 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010216 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010254 CMIT Server 0 commitIndex: 0, lastAppliedIndex: 0
+010254 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+010254 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+010260 INFO Server 2(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+010260 INFO Server 1(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+010261 LOG1 Server 2 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+010261 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+010324 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010324 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010324 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010432 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010432 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010432 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010541 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010541 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010541 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010659 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010659 SNAP Server 1 started snapshot process with log size 1, commitIndex 0
+010659 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010751 LEAD Server 0 has 2 logs with lastLogTerm: 1
+010752 LEAD Server 0 has 2 logs with lastLogTerm: 1
+010753 LEAD Server 0 try to replicate log AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]} to server 2
+010754 LEAD Server 0 try to replicate log AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]} to server 1
+010760 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010769 INFO Server 1(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+010770 LOG1 Server 1 log size: 1 lastLogTerm: 0, logs: [{0 0}]
+010771 INFO Server 2(term: 1) received logs from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]}
+010773 LOG1 Server 2 received log entries AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]}
+010774 PERS Server 2 log length before append: 1
+010774 LOG1 Server 2 truncated its log to index 0
+010775 PERS Server 2 log length after append: 2
+010775 LOG1 Server 2 append entries in log
+010776 LOG1 Server 2 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 12}]
+010769 SNAP Server 2 started snapshot process with log size 1, commitIndex 0
+010778 INFO Server 1(term: 1) received logs from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]}
+010779 LOG1 Server 1 received log entries AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: [{1 12}]}
+010781 PERS Server 1 log length before append: 1
+010782 LOG1 Server 1 truncated its log to index 0
+010782 PERS Server 1 log length after append: 2
+010782 LOG1 Server 1 append entries in log
+010784 INFO Server 2(term: 1) received heartbeat from leader id 0 with args AppendEntriesArgs{Term: 1, LeaderId: 0, PrevLogIndex: 0, PrevLogTerm: 0, LeaderCommit: 0, Entries: []}
+010785 LOG1 Server 2 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 12}]
+010783 LOG1 Server 1 log size: 2 lastLogTerm: 1, logs: [{0 0} {1 12}]
+010788 CMIT Server 0 replicated log 2 to server 2, update next index to 2
+010788 LEAD Server 0 has 2 logs with lastLogTerm: 1
+010788 LEAD Server 0 has no logs to replicate for server 2
+010790 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+010793 CMIT Server 0 replicated log 2 to server 1, update next index to 2
+010793 LEAD Server 0 has 2 logs with lastLogTerm: 1
+010793 LEAD Server 0 has no logs to replicate for server 1
+010872 SNAP Server 0 started snapshot process with log size 2, commitIndex 0
+010878 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+010886 LEAD Server 0 replicate log to majority, commits log 1 (term=1)
+010892 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+010983 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+010983 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+010993 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+011094 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+011094 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+011094 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+011195 SNAP Server 0 started snapshot process with log size 2, commitIndex 1
+011196 SNAP Server 1 started snapshot process with log size 2, commitIndex 0
+011195 SNAP Server 2 started snapshot process with log size 2, commitIndex 0
+011263 CMIT Server 1 commitIndex: 0, lastAppliedIndex: 0
+011263 CMIT Server 2 commitIndex: 0, lastAppliedIndex: 0
+011263 CMIT Server 0 commitIndex: 1, lastAppliedIndex: 0
+011263 CMIT Server 0 get index 1 command, log size 2
+0: log map[1:11]; server map[1:11]
+0: log map[1:11]; server map[1:11]
+0: log map[1:11]; server map[1:11]
+apply error: commit index=1 server=0 12 != server=2 11
+exit status 1
+FAIL	6.5840/raft	1.186s

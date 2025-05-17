@@ -14,21 +14,21 @@ func (rf *Raft) getCurrentTerm() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.CurrentTerm
+	return rf.electionState.CurrentTerm
 }
 
 func (rf *Raft) getVotedFor() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.VotedFor
+	return rf.electionState.VotedFor
 }
 
 func (rf *Raft) getLeaderInfo() (int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	isLeader := rf.state.Role == LEADER
+	isLeader := rf.electionState.Role == LEADER
 	var leaderId int
 	if isLeader {
 		leaderId = rf.me
@@ -81,30 +81,30 @@ func (rf *Raft) isCandidate() bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.Role == CANDIDATE
+	return rf.electionState.Role == CANDIDATE
 }
 
 func (rf *Raft) isLeader() bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.Role == LEADER
+	return rf.electionState.Role == LEADER
 }
 
 func (rf *Raft) GetRole() Role {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.state.Role
+	return rf.electionState.Role
 }
 
 func (rf *Raft) setState(role Role, term int, votedFor int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.state.Role = role
-	rf.state.CurrentTerm = term
-	rf.state.VotedFor = votedFor
+	rf.electionState.Role = role
+	rf.electionState.CurrentTerm = term
+	rf.electionState.VotedFor = votedFor
 	rf.persist()
 }
 
