@@ -35,7 +35,7 @@ func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 
 	curTime := time.Now()
 
-	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.state.Role == FOLLOWER || rf.state.Role == CANDIDATE)
+	return rf.lastCommTime.Add(timeout).Before(curTime) && (rf.electionState.Role == FOLLOWER || rf.electionState.Role == CANDIDATE)
 }
 
 func (rf *Raft) election() {
@@ -105,38 +105,39 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	rf.lastCommTime = time.Now()
+	// we should not update lastCommtime if the communication is not from the leader
+	// rf.lastCommTime = time.Now()
 
-	Debug(dVote, "Server %d received request vote %v, current votedFor %d\n", rf.me, args, rf.state.VotedFor)
+	Debug(dVote, "Server %d received request vote %v, current votedFor %d\n", rf.me, args, rf.electionState.VotedFor)
 	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
 	reply.VoteGranted = false
 	// requester's term is smaller than current peer's term
-	if requestTerm < rf.state.CurrentTerm {
-		reply.Term = rf.state.CurrentTerm
+	if requestTerm < rf.electionState.CurrentTerm {
+		reply.Term = rf.electionState.CurrentTerm
 		return
 	}
 
 	// requester's term is greater than current peer's term, convert current peer to follower
-	if requestTerm > rf.state.CurrentTerm {
-		Debug(dVote, "Server %d's term %d is lower than server %d's term %d\n", rf.me, rf.state.CurrentTerm, candidateId, requestTerm)
-		rf.state.CurrentTerm = requestTerm
-		rf.state.Role = FOLLOWER
-		rf.state.VotedFor = -1
+	if requestTerm > rf.electionState.CurrentTerm {
+		Debug(dVote, "Server %d's term %d is lower than server %d's term %d\n", rf.me, rf.electionState.CurrentTerm, candidateId, requestTerm)
+		rf.electionState.CurrentTerm = requestTerm
+		rf.electionState.Role = FOLLOWER
+		rf.electionState.VotedFor = -1
 		rf.persist()
 	}
 
 	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
 		Debug(dVote, "Server %d's lastLogIndex %d and lastLogTerm %d is more up-to-date than candidate %d's lastLogIndex %d and lastLogTerm %d\n",
 			rf.me, len(rf.logs)-1, rf.logs[len(rf.logs)-1].Term, candidateId, lastLogIndex, lastLogTerm)
-		reply.Term = rf.state.CurrentTerm
+		reply.Term = rf.electionState.CurrentTerm
 		reply.VoteGranted = false
 		return
 	}
 
 	// vote for requester
-	if rf.state.VotedFor == -1 || rf.state.VotedFor == candidateId {
-		rf.state.VotedFor = candidateId
-		rf.state.CurrentTerm = requestTerm
+	if rf.electionState.VotedFor == -1 || rf.electionState.VotedFor == candidateId {
+		rf.electionState.VotedFor = candidateId
+		rf.electionState.CurrentTerm = requestTerm
 		reply.VoteGranted = true
 		reply.Term = requestTerm
 		rf.persist()
