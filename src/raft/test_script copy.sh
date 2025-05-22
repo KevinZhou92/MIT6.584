@@ -2,12 +2,12 @@
 
 ITER=1
 while true; do
-  echo "=== Running TestFigure8Unreliable3C Iteration $ITER ==="
-  VERBOSE=1 go test -run TestFigure8Unreliable3C -race > raft.log 2>&1
+  echo "=== Running TestSnapshotInstallUnCrash3D Iteration $ITER ==="
+  VERBOSE=1 go test -run TestSnapshotInstallUnCrash3D -race > raft.log 2>&1
 
   if grep -q FAIL raft.log; then
     echo "!!! Test failed on iteration $ITER. Dumping logs with ./dslogs -c 3"
-    ./dslogs -c 5 < raft.log
+    ./dslogs -c 3 < raft.log
     break
   else
     echo "--- Test passed ---"

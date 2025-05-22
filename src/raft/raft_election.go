@@ -29,6 +29,16 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
+type ElectionState struct {
+	Role        Role
+	CurrentTerm int
+	VotedFor    int // index of the candidate that this peer voted for
+}
+
+func (state ElectionState) String() string {
+	return fmt.Sprintf("ElectionState: role: %s, CurrentTerm: %d, VotedFor: %d", roleMap[state.Role], state.CurrentTerm, state.VotedFor)
+}
+
 func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -39,8 +49,9 @@ func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 }
 
 func (rf *Raft) election() {
-	Debug(dVote, "Server %d started election, current term %d, current role %s", rf.me, rf.getCurrentTerm(), roleMap[rf.GetRole()])
-	ms := 300 + (rand.Int63() % 300)
+	currentTerm := rf.getCurrentTerm()
+	Debug(dVote, "Server %d started election, current term %d, current role %s", rf.me, currentTerm, roleMap[rf.GetRole()])
+	ms := 300 + (rand.Int63() % 200)
 	deadline := time.After(time.Duration(ms) * time.Millisecond)
 
 	resultCh := make(chan RequestVoteReply, len(rf.peers))
@@ -60,42 +71,50 @@ func (rf *Raft) election() {
 	for collected < len(rf.peers) {
 		select {
 		case reply := <-resultCh:
+			if !rf.isCandidate() {
+				Debug(dVote, "Server %d received a vote, however server's current role is %s\n", rf.me, roleMap[rf.GetRole()])
+				return
+			}
 			if reply.VoteGranted {
 				votes += 1
 				Debug(dVote, "Server %d received a vote, current vote %d\n", rf.me, votes)
 			}
 			// Found a peer with a greater term, this peer can't become the leader anymore, stop the leader election
-			if reply.Term > rf.getCurrentTerm() {
-				Debug(dVote, "Server %d's term %d is lower than peer's term %d", rf.me, rf.getCurrentTerm(), reply.Term)
+			if reply.Term > currentTerm {
+				Debug(dVote, "Server %d's term %d is lower than peer's term %d", rf.me, currentTerm, reply.Term)
 				rf.setState(FOLLOWER, reply.Term, -1)
 				return
 			}
 			collected += 1
 			// Elected as leader
 			if votes > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, rf.getCurrentTerm())
-				rf.setState(LEADER, rf.getCurrentTerm(), rf.me)
+				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, currentTerm)
+				rf.setState(LEADER, currentTerm, rf.me)
 				rf.initializePeerIndexState()
 				rf.startLeaderProcesses()
 
 				return
 			}
 		case <-deadline:
-			Debug(dInfo, "Server %d nothing happened during election for term %d. Waiting for new election\n", rf.me, rf.getCurrentTerm())
+			Debug(dInfo, "Server %d nothing happened during election for term %d. Waiting for new election\n", rf.me, currentTerm)
 			return
 		}
 	}
 }
 
 func (rf *Raft) startLeaderProcesses() {
+	// rf.appendLogLocally(LogEntry{rf.getCurrentTerm(), -1})
 	for server := range rf.peers {
 		if server == rf.me {
 			continue
 		}
-
-		go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(server), &AppendEntriesReply{})
+		// append a no-op entry at the beginnin of leader term, to make sure we can rely on
+		// this message to commit entry in a reconnected server, so that all servers can catch up
+		// Basically, this is a fake client write to froce all the peers to get to an agreement
+		go rf.sendAppendEntries(server, rf.buildHeartBeatArgs(), &AppendEntriesReply{})
 		go rf.runLogReplicator(server)
 	}
+
 	go rf.runReplicaCounter()
 }
 
@@ -105,10 +124,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// we should not update lastCommtime if the communication is not from the leader
+	// we should not update lastCommtime if someone is requesting for vote, otherwise we could let the unqualified
+	// peer keep requesting for vote
 	// rf.lastCommTime = time.Now()
 
-	Debug(dVote, "Server %d received request vote %v, current votedFor %d\n", rf.me, args, rf.electionState.VotedFor)
+	Debug(dVote, "Server %d received request vote %v, current electionState: %s\n", rf.me, args, rf.electionState)
 	requestTerm, candidateId, lastLogIndex, lastLogTerm := args.Term, args.CandidateId, args.LastLogIndex, args.LastLogTerm
 	reply.VoteGranted = false
 	// requester's term is smaller than current peer's term
@@ -126,9 +146,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.persist()
 	}
 
-	if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < len(rf.logs)-1) {
-		Debug(dVote, "Server %d's lastLogIndex %d and lastLogTerm %d is more up-to-date than candidate %d's lastLogIndex %d and lastLogTerm %d\n",
-			rf.me, len(rf.logs)-1, rf.logs[len(rf.logs)-1].Term, candidateId, lastLogIndex, lastLogTerm)
+	// if lastLogTerm < rf.logs[len(rf.logs)-1].Term || (lastLogTerm == rf.logs[len(rf.logs)-1].Term && lastLogIndex < absoluteIndex) {
+	if !rf.isCandidateLogUpToDate(lastLogIndex, lastLogTerm, candidateId) {
 		reply.Term = rf.electionState.CurrentTerm
 		reply.VoteGranted = false
 		return
@@ -136,21 +155,43 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// vote for requester
 	if rf.electionState.VotedFor == -1 || rf.electionState.VotedFor == candidateId {
+		// Reset last comm time if current peer just voted for a candiat
+		rf.lastCommTime = time.Now()
 		rf.electionState.VotedFor = candidateId
 		rf.electionState.CurrentTerm = requestTerm
 		reply.VoteGranted = true
 		reply.Term = requestTerm
 		rf.persist()
-		Debug(dVote, "Server %d votedFor server %d\n", rf.me, candidateId)
+		Debug(dVote, "Server %d votedFor server %d, electionState: %v\n", rf.me, candidateId, rf.electionState)
 		return
 	}
 }
 
+// Check if requester's log is more up-to-date
+func (rf *Raft) isCandidateLogUpToDate(peerLastLogIndex int, peerLastLogTerm int, server int) bool {
+	var lastLogTerm int
+	lastLogIndex := rf.snapshotState.LastIncludedIndex + len(rf.logs)
+
+	if len(rf.logs) == 0 {
+		lastLogTerm = rf.snapshotState.LastIncludedTerm
+	} else {
+		lastLogTerm = rf.logs[len(rf.logs)-1].Term
+	}
+
+	Debug(dVote, "Server %d's lastLogIndex %d and lastLogTerm %d and candidate %d's lastLogIndex %d and lastLogTerm %d\n",
+		rf.me, lastLogIndex, lastLogTerm, server, peerLastLogIndex, peerLastLogTerm)
+	if lastLogTerm != peerLastLogTerm {
+		return peerLastLogTerm >= lastLogTerm
+	}
+
+	return peerLastLogIndex >= lastLogIndex
+}
+
 func (rf *Raft) getVote(resultChan chan RequestVoteReply, server int) {
-	lastLogIndex := rf.getLogSize() - 1
-	lastLogEntry, err := rf.getLogEntry(lastLogIndex)
+	lastLogIndex := rf.getLogSizeWithSnapshotInfo() - 1
+	lastLogEntry, err := rf.getLogEntryWithSnapshotInfo(lastLogIndex)
 	if err != nil {
-		Debug(dError, "Server %d can't get log from lastLogIndex %d, log size: %d, give up get Vote", rf.me, lastLogIndex, rf.getLogSize())
+		Debug(dError, "Server %d can't get log from lastLogIndex %d, log size: %d, give up get Vote", rf.me, lastLogIndex, rf.getLogSizeWithSnapshotInfo())
 		return
 	}
 	lastLogTerm := lastLogEntry.Term

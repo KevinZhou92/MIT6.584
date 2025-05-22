@@ -199,7 +199,7 @@ func (cfg *config) ingestSnap(i int, snapshot []byte, index int) string {
 		return "snapshot Decode() error"
 	}
 	if index != -1 && index != lastIncludedIndex {
-		err := fmt.Sprintf("server %v snapshot doesn't match m.SnapshotIndex", i)
+		err := fmt.Sprintf("server %v snapshot index %d, doesn't match m.SnapshotIndex %d", i, index, lastIncludedIndex)
 		return err
 	}
 	cfg.logs[i] = map[int]interface{}{}
@@ -586,10 +586,13 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 			for time.Since(t1).Seconds() < 2 {
 				nd, cmd1 := cfg.nCommitted(index)
 				if nd > 0 && nd >= expectedServers {
+					// fmt.Printf("==committed %d, cmd1 %d index %d, cmd %d\n", nd, cmd1, index, cmd)
 					// committed
 					if cmd1 == cmd {
 						// and it was the command we submitted.
 						return index
+					} else {
+						// fmt.Printf("==cmd1 %d != cmd %d\n", cmd1, cmd)
 					}
 				}
 				time.Sleep(20 * time.Millisecond)

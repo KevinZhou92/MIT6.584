@@ -1,52 +1,10 @@
 package raft
 
-import "errors"
-
-var roleMap = map[Role]string{
-	LEADER:    "Leader",
-	CANDIDATE: "Candidate",
-	FOLLOWER:  "Follower",
-}
-
-var EMPTY_LOG_ENTRY LogEntry = LogEntry{-1, -1}
-
-func (rf *Raft) getCurrentTerm() int {
+func (rf *Raft) getLogState() LogState {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	return rf.electionState.CurrentTerm
-}
-
-func (rf *Raft) getVotedFor() int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.electionState.VotedFor
-}
-
-func (rf *Raft) getLeaderInfo() (int, bool) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	isLeader := rf.electionState.Role == LEADER
-	var leaderId int
-	if isLeader {
-		leaderId = rf.me
-	} else {
-		leaderId = -1
-	}
-
-	return leaderId, isLeader
-}
-
-func (rf *Raft) getPrevLogInfo(server int) (int, int) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	prevLogIndex := rf.peerIndexState.nextIndex[server] - 1
-	prevLogTerm := rf.logs[prevLogIndex].Term
-
-	return prevLogIndex, prevLogTerm
+	return *rf.logState
 }
 
 func (rf *Raft) getServerCommitIndex() int {
@@ -56,6 +14,7 @@ func (rf *Raft) getServerCommitIndex() int {
 	return rf.logState.commitIndex
 }
 
+// volatile state on all servers
 func (rf *Raft) setServerCommitIndex(commitIndex int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -77,60 +36,6 @@ func (rf *Raft) setServerAppliedIndex(appliedIndex int) {
 	rf.logState.lastAppliedIndex = appliedIndex
 }
 
-func (rf *Raft) isCandidate() bool {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.electionState.Role == CANDIDATE
-}
-
-func (rf *Raft) isLeader() bool {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.electionState.Role == LEADER
-}
-
-func (rf *Raft) GetRole() Role {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.electionState.Role
-}
-
-func (rf *Raft) setState(role Role, term int, votedFor int) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.electionState.Role = role
-	rf.electionState.CurrentTerm = term
-	rf.electionState.VotedFor = votedFor
-	rf.persist()
-}
-
-// volatile state on all servers
-func (rf *Raft) getLogEntry(logIndex int) (LogEntry, error) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	if logIndex < 0 || logIndex >= len(rf.logs) {
-		return EMPTY_LOG_ENTRY, errors.New("log index out of range")
-	}
-
-	return rf.logs[logIndex], nil
-}
-
-func (rf *Raft) getLogEntriesFromIndex(logIndex int) ([]LogEntry, error) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	if logIndex < 0 || logIndex >= len(rf.logs) {
-		return []LogEntry{EMPTY_LOG_ENTRY}, errors.New("log index out of range")
-	}
-
-	return rf.logs[logIndex:], nil
-}
-
 func (rf *Raft) getLogSize() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -138,9 +43,20 @@ func (rf *Raft) getLogSize() int {
 	return len(rf.logs)
 }
 
+func (rf *Raft) getLogSizeWithSnapshotInfo() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return len(rf.logs) + rf.snapshotState.LastIncludedIndex + 1
+}
+
 func (rf *Raft) getLastLogTerm() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+
+	if len(rf.logs) == 0 {
+		return rf.snapshotState.LastIncludedTerm
+	}
 
 	return rf.logs[len(rf.logs)-1].Term
 }
@@ -156,7 +72,7 @@ func (rf *Raft) initializePeerIndexState() {
 	}
 
 	for idx := range len(rf.peers) {
-		rf.peerIndexState.nextIndex[idx] = len(rf.logs)
+		rf.peerIndexState.nextIndex[idx] = len(rf.logs) + rf.snapshotState.LastIncludedIndex
 		rf.peerIndexState.matchIndex[idx] = 0
 	}
 }

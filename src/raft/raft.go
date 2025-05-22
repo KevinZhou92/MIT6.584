@@ -20,7 +20,6 @@ package raft
 import (
 	//	"bytes"
 
-	"bytes"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -28,7 +27,7 @@ import (
 	"time"
 
 	//	"6.5840/labgob"
-	"6.5840/labgob"
+
 	"6.5840/labrpc"
 )
 
@@ -41,18 +40,6 @@ import (
 // in part 3D you'll want to send other kinds of messages (e.g.,
 // snapshots) on the applyCh, but set CommandValid to false for these
 // other uses.
-type ApplyMsg struct {
-	CommandValid bool
-	Command      interface{}
-	CommandIndex int
-
-	// For 3D:
-	SnapshotValid bool
-	Snapshot      []byte
-	SnapshotTerm  int
-	SnapshotIndex int
-}
-
 type Role int
 
 const (
@@ -61,29 +48,23 @@ const (
 	FOLLOWER
 )
 
-type ElectionState struct {
-	Role        Role
-	CurrentTerm int
-	VotedFor    int // index of the candidate that this peer voted for
+type SnapshotState struct {
+	LastIncludedIndex int // index of last included entry in snapshot, this information will be used to get entry from truncated rf.logs
+	LastIncludedTerm  int // term of laster included entry in snapshot
 }
 
-func (state *ElectionState) String() string {
-	return fmt.Sprintf("ElectionState: role: %s, CurrentTerm: %d, VotedFor: %d", roleMap[state.Role], state.CurrentTerm, state.VotedFor)
+func (state *SnapshotState) String() string {
+	return fmt.Sprintf("SnapshotState: LastIncludedIndex: %d, LastIncludedTerm: %d", state.LastIncludedIndex, state.LastIncludedTerm)
 }
-
-// type SnapshotState struct {
-// 	LastIncludedIndex int // index of last included entry in snapshot
-// 	LastIncludedTerm  int // term of laster included entry in snapshot
-// }
-
-// func (state *SnapshotState) String() string {
-// 	return fmt.Sprintf("SnapshotState: LastIncludedIndex: %d, LastIncludedTerm: %d", state.LastIncludedIndex, state.LastIncludedTerm)
-// }
 
 // A go object recording the index state for the logs
 type LogState struct {
 	commitIndex      int
 	lastAppliedIndex int
+}
+
+func (logState *LogState) String() string {
+	return fmt.Sprintf("LogState: commitIndex: %d, lastAppliedIndex: %d", logState.commitIndex, logState.lastAppliedIndex)
 }
 
 // A go object recording the index state for each peer
@@ -109,10 +90,13 @@ type Raft struct {
 	logs           []LogEntry
 	logState       *LogState       // the commited log index and the applied log index, here applied means the result has been returned to client
 	peerIndexState *PeerIndexState // the next index and match index for each peer
-	applyCh        chan ApplyMsg
 
-	// Snapshot sectoin
-	lastIncludedIndex int
+	applyCond *sync.Cond
+	applyCh   chan ApplyMsg
+
+	// Snapshot section
+	snapshotState           *SnapshotState
+	pendingSnapshotApplyMsg *ApplyMsg
 }
 
 // return currentTerm and whether this server
@@ -130,95 +114,6 @@ func (rf *Raft) GetState() (int, bool) {
 	return term, isleader
 }
 
-// save Raft's persistent state to stable storage,
-// where it can later be retrieved after a crash and restart.
-// see paper's Figure 2 for a description of what should be persistent.
-// before you've implemented snapshots, you should pass nil as the
-// second argument to persister.Save().
-// after you've implemented snapshots, pass the current snapshot
-// (or nil if there's not yet a snapshot).
-func (rf *Raft) persist() {
-	// Your code here (3C).
-	// Example:
-	w := new(bytes.Buffer)
-	e := labgob.NewEncoder(w)
-	e.Encode(rf.electionState)
-	e.Encode(rf.logs)
-	raftstate := w.Bytes()
-
-	rf.persister.Save(raftstate, nil)
-}
-
-// restore previously persisted state.
-func (rf *Raft) readPersist(data []byte) {
-	if data == nil || len(data) < 1 { // bootstrap without any state?
-		return
-	}
-	// Your code here (3C).
-	// Example:
-	r := bytes.NewBuffer(data)
-	d := labgob.NewDecoder(r)
-	var electionState ElectionState
-	var logs []LogEntry
-	if d.Decode(&electionState) != nil || d.Decode(&logs) != nil {
-		Debug(dError, "Server %d is unable to restore persist state", rf.me)
-		return
-	}
-
-	rf.electionState = &electionState
-	rf.logs = logs
-}
-
-// the service says it has created a snapshot that has
-// all info up to and including index. this means the
-// service no longer needs the log through (and including)
-// that index. Raft should now trim its log as much as possible.
-func (rf *Raft) Snapshot(index int, snapshot []byte) {
-	// Your code here (3D).
-	// truncate log and write snapshot to persister
-	// rf.logs = rf.logs[index+1:]
-
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e.Encode(rf.electionState)
-	// e.Encode(rf.logs)
-	// raftstate := w.Bytes()
-
-	// rf.persister.Save(raftstate, snapshot)
-}
-
-func (rf *Raft) runSnapshotProcess() {
-	for !rf.killed() {
-		// time.Sleep(10 * time.Millisecond)
-		// // 	// Debug(dSnap, "Server %d started snapshot process with log size %d, commitIndex %d", rf.me, rf.getLogSize(), rf.getServerCommitIndex())
-		// rf.mu.Lock()
-		// lastCommittedIndex := rf.logState.commitIndex
-
-		// snapshotData := rf.persister.ReadSnapshot()
-		// r := bytes.NewBuffer(snapshotData)
-		// d := labgob.NewDecoder(r)
-		// var lastIncludedIndex int
-		// var snapshotLogs []LogEntry
-		// if d.Decode(&lastIncludedIndex) != nil || d.Decode(&snapshotLogs) != nil {
-		// 	Debug(dError, "Server %d is unable to restore snapshot logs", rf.me)
-		// 	snapshotLogs = []LogEntry{}
-		// 	lastIncludedIndex = -1
-		// }
-
-		// actualIndex := lastCommittedIndex - lastIncludedIndex - 1
-		// snapshotLogs = append(snapshotLogs, rf.logs[actualIndex+1])
-		// w := new(bytes.Buffer)
-		// e := labgob.NewEncoder(w)
-		// lastIncludedIndex = actualIndex
-		// e.Encode(lastIncludedIndex)
-		// e.Encode(snapshotLogs)
-		// snapshotData = w.Bytes()
-		// rf.Snapshot(actualIndex, snapshotData)
-		// rf.mu.Unlock()
-
-	}
-}
-
 // the service using Raft (e.g. a k/v server) wants to start
 // agreement on the next command to be appended to Raft's log. if this
 // server isn't the leader, returns false. otherwise start the
@@ -232,8 +127,11 @@ func (rf *Raft) runSnapshotProcess() {
 // term. the third return value is true if this server believes it is
 // the leader.
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	term := rf.getCurrentTerm()
+	// We need to check if it is leader and then append log
+	// if we retrieve the term first and then check if current peer is a leader
+	// we could retrieve an old term
 	_, isLeader := rf.getLeaderInfo()
+	term := rf.getCurrentTerm()
 
 	// return immediately if current peer is not leader
 	if !isLeader {
@@ -243,20 +141,6 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := rf.appendLogLocally(LogEntry{term, command})
 
 	return index, term, isLeader
-}
-
-func (rf *Raft) appendLogLocally(logEntry LogEntry) int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.logs = append(rf.logs, logEntry)
-	rf.persist()
-
-	rf.peerIndexState.nextIndex[rf.me] = len(rf.logs)
-	rf.peerIndexState.matchIndex[rf.me] = len(rf.logs) - 1
-	Debug(dLog, "Server %d appended log %v and has log size %d", rf.me, logEntry, len(rf.logs))
-
-	return len(rf.logs) - 1
 }
 
 // the tester doesn't halt goroutines created by Raft after each test,
@@ -284,7 +168,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
-		timeout := (300 + time.Duration(rand.Int63()%300)) * time.Millisecond
+		timeout := (300 + time.Duration(rand.Int63()%200)) * time.Millisecond
 		time.Sleep(timeout)
 		// Debug(dLog, "Server %d is %s", rf.me, roleMap[rf.state.role])
 		// Debug(dTerm, "Server %d term is %d", rf.me, rf.state.currentTerm)
@@ -318,15 +202,22 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.logs = []LogEntry{
 		{Term: 0, Command: 0},
 	}
-	rf.logState = &LogState{len(rf.logs) - 1, 0}
+	// rf.logState = &LogState{len(rf.logs) - 1, 0}
 	rf.applyCh = applyCh
 
+	rf.snapshotState = &SnapshotState{-1, -1}
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-	Debug(dInfo, "Server %d started with electionState: %v, logs: %v", rf.me, rf.electionState, rf.logs)
+	// A peer would always starts as a follower
+	rf.setState(FOLLOWER, rf.getCurrentTerm(), -1)
+
+	rf.logState = &LogState{max(rf.snapshotState.LastIncludedIndex, 0), max(rf.snapshotState.LastIncludedIndex, 0)}
+	Debug(dInfo, "Server %d started with electionState: %v, logs: %v, snapshotState: %v", rf.me, rf.electionState, rf.logs, rf.snapshotState)
 
 	rf.initializePeerIndexState()
 	Debug(dInfo, "Server %d started with PeerIndexState: %v", rf.me, rf.peerIndexState)
+
+	rf.applyCond = sync.NewCond(&rf.mu)
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
@@ -341,8 +232,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// Apply committed message on each peer
 	go rf.runApplier()
-
-	// go rf.runSnapshotProcess()
 
 	Debug(dInfo, "Server %d started with term %d", rf.me, rf.getCurrentTerm())
 
