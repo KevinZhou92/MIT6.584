@@ -51,7 +51,7 @@ func (rf *Raft) shoudStartElection(timeout time.Duration) bool {
 func (rf *Raft) election() {
 	currentTerm := rf.getCurrentTerm()
 	Debug(dVote, "Server %d started election, current term %d, current role %s", rf.me, currentTerm, roleMap[rf.GetRole()])
-	ms := 300 + (rand.Int63() % 200)
+	ms := 300 + (rand.Int63() % 300)
 	deadline := time.After(time.Duration(ms) * time.Millisecond)
 
 	resultCh := make(chan RequestVoteReply, len(rf.peers))
@@ -88,7 +88,7 @@ func (rf *Raft) election() {
 			collected += 1
 			// Elected as leader
 			if votes > len(rf.peers)/2 {
-				Debug(dLeader, "Server %d has %d votes with term %d and is LEADER now!\n", rf.me, votes, currentTerm)
+				Debug(dLeader, "Server %d has %d votes with term %d(log size: %d) and is LEADER now!\n", rf.me, votes, currentTerm, rf.getLogSizeWithSnapshotInfo())
 				rf.setState(LEADER, currentTerm, rf.me)
 				rf.initializePeerIndexState()
 				rf.startLeaderProcesses()
@@ -116,6 +116,7 @@ func (rf *Raft) startLeaderProcesses() {
 	}
 
 	go rf.runReplicaCounter()
+	go rf.runHeartbeatProcess()
 }
 
 // example RequestVote RPC handler.

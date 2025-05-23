@@ -2,12 +2,12 @@ package raft
 
 import "time"
 
-func (rf *Raft) sendHeartbeat() {
+func (rf *Raft) runHeartbeatProcess() {
 	for !rf.killed() {
-		time.Sleep(time.Duration(40) * time.Millisecond)
+		time.Sleep(time.Duration(50) * time.Millisecond)
 
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
-			continue
+			return
 		}
 
 		for server := range rf.peers {

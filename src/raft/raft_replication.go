@@ -69,7 +69,6 @@ func (rf *Raft) runReplicaCounter() {
 
 		currentTerm := rf.getCurrentTerm()
 		lastLogIndex := rf.getLogSizeWithSnapshotInfo() - 1
-
 		for curIdx := rf.getServerCommitIndex() + 1; curIdx <= lastLogIndex; curIdx++ {
 			entry, err := rf.getLogEntryWithSnapshotInfo(curIdx)
 			if err != nil || entry.Term != currentTerm {
@@ -90,7 +89,7 @@ func (rf *Raft) runReplicaCounter() {
 			}
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -159,7 +158,7 @@ func (rf *Raft) runApplier() {
 }
 
 func (rf *Raft) runLogReplicator(server int) {
-	Debug(dLeader, "Server %d started log replicator for server %d\n", rf.me, server)
+	Debug(dLeader, "Server %d started log replicator for server %d", rf.me, server)
 	// This boolean indicates if the prev append entry call is successful, if yes, we will
 	// send log entries in batch in the following request, this case we can avoid always sending
 	// all the remaining logs thus save some bandwidth
@@ -167,13 +166,13 @@ func (rf *Raft) runLogReplicator(server int) {
 	for !rf.killed() {
 		snapshotState := rf.getSnapshotState()
 		if rf.getLogSize() == 0 && rf.getMatchIndexForPeer(server) == snapshotState.LastIncludedIndex {
-			Debug(dLeader, "Server %d has 0 logs to replicate to peer %d, nextLogIndex: %d, snapshotState: %v", rf.me, server, rf.getNextIndexForPeer(server), snapshotState)
+			Debug(dLeader, "Server %d has 0 logs to replicate to peer %d, nextLogIndex: %d, snapshotState: %v [thread: %d]", rf.me, server, rf.getNextIndexForPeer(server), snapshotState, server)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
 		if rf.getLogSize() != 0 {
-			Debug(dLeader, "Server %d(term: %d, electionState: %s) has %d logs with lastLogTerm: %d", rf.me, rf.getCurrentTerm(), rf.getElectionState(), rf.getLogSize(), rf.getLastLogTerm())
+			Debug(dLeader, "Server %d(term: %d, electionState: %s) has %d logs with lastLogTerm: %d [thread: %d]", rf.me, rf.getCurrentTerm(), rf.getElectionState(), rf.getLogSize(), rf.getLastLogTerm(), server)
 		}
 
 		currentTerm := rf.getCurrentTerm()
@@ -187,15 +186,14 @@ func (rf *Raft) runLogReplicator(server int) {
 		prevLog, err := rf.getLogEntryWithSnapshotInfo(prevLogIndex)
 		prevLogTerm := prevLog.Term
 		if err != nil {
-			Debug(dError, "Server %d has less logs for server %d, log size: %d, prevLogIndex: %d, reduce nextIndex to %d",
-				rf.me, server, rf.getLogSize(), prevLogIndex, rf.getLogSizeWithSnapshotInfo())
-			rf.setNextIndexForPeer(server, rf.getLogSizeWithSnapshotInfo())
+			Debug(dError, "Server %d has less logs for server %d, log size: %d, prevLogIndex: %d, reduce nextIndex to %d [thread: %d]",
+				rf.me, server, rf.getLogSize(), prevLogIndex, rf.getSnapshotState().LastIncludedIndex+1, server)
 			rf.installSnapshot(server)
 			continue
 		}
 
 		if nextIndex >= rf.getLogSizeWithSnapshotInfo() {
-			//Debug(dLeader, "Server %d has no logs to replicate for server %d", rf.me, server)
+			Debug(dLeader, "Server %d has no logs to replicate for server %d", rf.me, server)
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
@@ -203,7 +201,7 @@ func (rf *Raft) runLogReplicator(server int) {
 		// logEntries, err := rf.getLogEntriesFromIndex(nextIndex)
 		logEntries, err := rf.getLogEntriesFromIndexWithSnapshotInfo(nextIndex)
 		if err != nil {
-			Debug(dError, "Server %d has less logs for server %d, log size: %d, reduce nextIndex to %d", rf.me, server, rf.getLogSize(), rf.getLogSizeWithSnapshotInfo())
+			Debug(dError, "Server %d has less logs for server %d, log size: %d, reduce nextIndex to %d [thread: %d]", rf.me, server, rf.getLogSize(), rf.getLogSizeWithSnapshotInfo(), server)
 			rf.setNextIndexForPeer(server, rf.getLogSizeWithSnapshotInfo())
 			continue
 		}
@@ -224,7 +222,7 @@ func (rf *Raft) runLogReplicator(server int) {
 
 		// Stop log replicator is current peer is not leader anymore
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
-			Debug(dLeader, "Server %d is not leader anymore, will not replicate logs", rf.me)
+			Debug(dLeader, "Server %d is not leader anymore, will not replicate logs [thread: %d]", rf.me, server)
 			return
 		}
 
@@ -326,12 +324,13 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// leaderId := args.LeaderId
 	entries := args.Entries
-	prevLogIndex := args.PrevLogIndex
+	// this is the index assume the log is never truncated
+	virtualPrevLogIndex := args.PrevLogIndex
 	prevLogTerm := args.PrevLogTerm
 	leaderCommitIndex := args.LeaderCommit
 
 	// get the actual index in current logs
-	realPrevLogIndex := prevLogIndex - rf.snapshotState.LastIncludedIndex - 1
+	realPrevLogIndex := virtualPrevLogIndex - rf.snapshotState.LastIncludedIndex - 1
 
 	// reply false if term < current term
 	if reqTerm < rf.electionState.CurrentTerm {
@@ -395,14 +394,32 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			return
 		}
 
+		//
+		//    Log truncate and append
+		//
 		// Truncate log if prevLogIndex is not the last log in current peer's log.This could happen during a split brain scenario.
 		// Note that we should not truncte committed log as once log is committed it it durable
-
 		Debug(dLog, "Server %d received log entries %s\n", rf.me, args)
-		if prevLogIndex >= rf.logState.commitIndex && realPrevLogIndex+1 <= len(rf.logs) {
+		// we might need to truncate log if there is any mistmatch for log entry at the same index
+		// Don't just blindly truncate like rf.logs = rf.logs[:realPrevLogIndex+1] as an out of order message could incorrectly truncate
+		// message
+		// we should not change committed entry, we should only check entries that are not committed
+		if realPrevLogIndex+1 <= len(rf.logs) {
 			Debug(dPersist, "Server %d log length before append: %d", rf.me, len(rf.logs))
-			rf.logs = rf.logs[:realPrevLogIndex+1]
-			Debug(dLog, "Server %d truncated its log to index %d", rf.me, prevLogIndex)
+			misMatchIndex := -1
+			entryIndex := 0
+			for idx := realPrevLogIndex + 1; idx < len(rf.logs) && entryIndex < len(entries); idx += 1 {
+				if rf.logs[idx].Term != entries[idx-realPrevLogIndex-1].Term {
+					misMatchIndex = idx
+					break
+				}
+				entryIndex += 1
+			}
+
+			if misMatchIndex != -1 {
+				rf.logs = rf.logs[:misMatchIndex]
+				Debug(dLog, "Server %d truncated its log to index %d", rf.me, misMatchIndex)
+			}
 		}
 
 		// If there were retries for a request, we just do an idempotenet operation here, we are put the entry
@@ -448,6 +465,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			newCommitIndex = i
 		}
 		rf.logState.commitIndex = newCommitIndex
+		Debug(dWarn, "Server %d's commitIndex %d, lastAppliedIndex %d, server snapshotState %v, logSize: %d",
+			rf.me, rf.logState.commitIndex, rf.logState.lastAppliedIndex, rf.snapshotState, len(rf.logs))
 		rf.applyCond.Signal()
 	}
 
