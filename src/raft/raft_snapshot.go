@@ -84,7 +84,12 @@ func (rf *Raft) installSnapshot(server int) {
 		Debug(dSnap, "Server %d is not leader anymore cuz there is a peer has a higher term", rf.me)
 		rf.setState(FOLLOWER, replyTerm, -1)
 	}
+	// Update next index and match index after installing the snapshot
 	rf.setNextIndexForPeer(server, installSnapShotArgs.LastIncludedIndex+1)
+	rf.setMatchIndexForPeer(server, installSnapShotArgs.LastIncludedIndex)
+
+	Debug(dSnap, "Server %d installed snapshot %v on peer %d, set nextIndex as %d, matchIndex as %d",
+		rf.me, installSnapShotArgs, server, rf.getNextIndexForPeer(server), rf.getMatchIndexForPeer(server))
 }
 
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapShotArgs, reply *InstallSnapShotReply) bool {
@@ -109,7 +114,7 @@ func (rf *Raft) InstallSnapShot(args *InstallSnapShotArgs, reply *InstallSnapSho
 	}
 
 	if lastIncludedIndex < rf.snapshotState.LastIncludedIndex {
-		Debug(dSnap, "Server %d received install snapshot request: %v but has larger lastIncludedIndex %d", rf.me, args, rf.snapshotState.LastIncludedIndex)
+		Debug(dSnap, "Server %d received install snapshot request: %v but has more recent snapshot %d", rf.me, args, rf.snapshotState.LastIncludedIndex)
 		return
 	}
 
@@ -124,13 +129,8 @@ func (rf *Raft) InstallSnapShot(args *InstallSnapShotArgs, reply *InstallSnapSho
 		Debug(dSnap, "Server %d will advance lastAppliedIndex according to snapshot request: %v. Logstate: %v", rf.me, args, rf.logState)
 		rf.pendingSnapshotApplyMsg = &ApplyMsg{false, -1, -1, true, data, lastIncludedIndexTerm, lastIncludedIndex}
 		rf.logState.lastAppliedIndex = lastIncludedIndex
-		return
-	}
-
-	if lastIncludedIndex >= rf.logState.commitIndex {
+		rf.logState.commitIndex = max(rf.logState.commitIndex, lastIncludedIndex)
 		Debug(dSnap, "Server %d update logState %s with last included index %d", rf.me, rf.logState, lastIncludedIndex)
-		rf.logState.commitIndex = lastIncludedIndex
-		rf.logState.lastAppliedIndex = lastIncludedIndex
 	}
 
 	rf.snapshotState = &SnapshotState{lastIncludedIndex, lastIncludedIndexTerm}

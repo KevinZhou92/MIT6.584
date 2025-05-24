@@ -163,7 +163,7 @@ func TestRPCBytes3B(t *testing.T) {
 	var sent int64 = 0
 	for index := 2; index < iters+2; index++ {
 		cmd := randstring(5000)
-		xindex := cfg.one(cmd, servers, false)
+		xindex := cfg.one(index+iters, servers, false)
 		if xindex != index {
 			t.Fatalf("got index %v but expected %v", xindex, index)
 		}

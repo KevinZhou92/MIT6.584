@@ -71,5 +71,4 @@ func Debug(topic logTopic, format string, a ...interface{}) {
 	prefix := fmt.Sprintf("%06d %v ", time, string(topic))
 	format = prefix + format
 	log.Printf(format, a...)
-
 }

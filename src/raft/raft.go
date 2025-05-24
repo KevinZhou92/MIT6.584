@@ -168,7 +168,7 @@ func (rf *Raft) ticker() {
 		// Check if a leader election should be started.
 		// pause for a random amount of time between 50 and 350
 		// milliseconds.
-		timeout := (300 + time.Duration(rand.Int63()%200)) * time.Millisecond
+		timeout := (300 + time.Duration(rand.Int63()%300)) * time.Millisecond
 		time.Sleep(timeout)
 		// Debug(dLog, "Server %d is %s", rf.me, roleMap[rf.state.role])
 		// Debug(dTerm, "Server %d term is %d", rf.me, rf.state.currentTerm)
@@ -221,9 +221,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// start ticker goroutine to start elections
 	go rf.ticker()
-
-	// start heatbeat goroutine to start elections
-	go rf.sendHeartbeat()
 
 	// start log replicator if raft peer is a leader
 	if rf.isLeader() {

@@ -22,20 +22,6 @@ func (rf *Raft) setServerCommitIndex(commitIndex int) {
 	rf.logState.commitIndex = commitIndex
 }
 
-func (rf *Raft) getServerAppliedIndex() int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	return rf.logState.lastAppliedIndex
-}
-
-func (rf *Raft) setServerAppliedIndex(appliedIndex int) {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
-	rf.logState.lastAppliedIndex = appliedIndex
-}
-
 func (rf *Raft) getLogSize() int {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -72,9 +58,16 @@ func (rf *Raft) initializePeerIndexState() {
 	}
 
 	for idx := range len(rf.peers) {
-		rf.peerIndexState.nextIndex[idx] = len(rf.logs) + rf.snapshotState.LastIncludedIndex
+		rf.peerIndexState.nextIndex[idx] = len(rf.logs) + rf.snapshotState.LastIncludedIndex + 1
 		rf.peerIndexState.matchIndex[idx] = 0
 	}
+}
+
+func (rf *Raft) getPeerIndexState() PeerIndexState {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	return *rf.peerIndexState
 }
 
 func (rf *Raft) getMatchIndexForPeer(server int) int {

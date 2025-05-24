@@ -53,9 +53,17 @@ n_columns = args.n_columns
 panic = False
 for line in input_:
     try:
-        time = int(line[:6])
-        topic = line[7:11]
-        msg = line[12:].strip()
+        # time = int(line[:6])
+        # topic = line[7:11]
+        # msg = line[12:].strip()
+        line = line.rstrip()
+        match = re.match(r"^(\d+)\s+(\w{4})\s+(.*)", line)
+        if not match:
+            console.print(line)
+            continue
+
+        time_str, topic, msg = match.groups()
+        time = int(time_str)
 
         if topic not in topics:
             continue
