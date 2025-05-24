@@ -130,8 +130,10 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	// We need to check if it is leader and then append log
 	// if we retrieve the term first and then check if current peer is a leader
 	// we could retrieve an old term
-	_, isLeader := rf.getLeaderInfo()
-	term := rf.getCurrentTerm()
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	term, isLeader := rf.electionState.CurrentTerm, rf.electionState.Role == LEADER
 
 	// return immediately if current peer is not leader
 	if !isLeader {

@@ -220,7 +220,10 @@ func (rf *Raft) runLogReplicator(server int) {
 		// 	continue
 		// }
 
-		// Stop log replicator is current peer is not leader anymore
+		// Stop log replicator is current peer is not leader anymore, we haver to put this check after we build the appendEntriesArgs request
+		// this way we make sure we only send out request with the corrrect leader information
+		// If we put the check at the beginning then we might generate the appendEntries when the server is not leader anymore, leading
+		// to problems in log replication
 		if _, isLeader := rf.getLeaderInfo(); !isLeader {
 			Debug(dLeader, "Server %d is not leader anymore, will not replicate logs [thread: %d]", rf.me, server)
 			return
@@ -482,9 +485,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 }
 
 func (rf *Raft) appendLogLocally(logEntry LogEntry) int {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
-
 	rf.logs = append(rf.logs, logEntry)
 	rf.persist()
 

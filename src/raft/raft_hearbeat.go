@@ -3,6 +3,7 @@ package raft
 import "time"
 
 func (rf *Raft) runHeartbeatProcess() {
+	Debug(dInfo, "Server %d start heartbeat process", rf.me)
 	for !rf.killed() {
 		time.Sleep(time.Duration(50) * time.Millisecond)
 
