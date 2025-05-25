@@ -119,7 +119,7 @@ func (rf *Raft) runApplier() {
 
 		// Prepare committed log entries to apply
 		for curIndex := rf.logState.lastAppliedIndex + 1; curIndex <= rf.logState.commitIndex; curIndex++ {
-			realIndex := curIndex - rf.snapshotState.LastIncludedIndex - 1
+			realIndex := rf.getRealIndex(curIndex)
 			if realIndex < 0 || realIndex >= len(rf.logs) {
 				Debug(dError, "Server %d can't get index %d from log, log size %d", rf.me, curIndex, len(rf.logs))
 				continue
@@ -329,11 +329,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	entries := args.Entries
 	// this is the index assume the log is never truncated
 	virtualPrevLogIndex := args.PrevLogIndex
-	prevLogTerm := args.PrevLogTerm
+	prevLogTermFromLeader := args.PrevLogTerm
 	leaderCommitIndex := args.LeaderCommit
 
 	// get the actual index in current logs
-	realPrevLogIndex := virtualPrevLogIndex - rf.snapshotState.LastIncludedIndex - 1
+	realPrevLogIndex := rf.getRealIndex(virtualPrevLogIndex)
 
 	// reply false if term < current term
 	if reqTerm < rf.electionState.CurrentTerm {
@@ -382,10 +382,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			prevLogTermOnServer = rf.logs[realPrevLogIndex].Term
 		}
 
-		if realPrevLogIndex >= 0 && prevLogTermOnServer != prevLogTerm {
-			Debug(dWarn, "Server %d's term at prevLogIndex %d doesn't match prevLogTerm %d\n", rf.me, realPrevLogIndex, prevLogTerm)
+		if realPrevLogIndex >= 0 && prevLogTermOnServer != prevLogTermFromLeader {
+			Debug(dWarn, "Server %d's term at prevLogIndex %d doesn't match prevLogTerm %d\n", rf.me, realPrevLogIndex, prevLogTermFromLeader)
 			index := realPrevLogIndex
-			for index < len(rf.logs) && index > 0 && rf.logs[index].Term != prevLogTerm {
+			for index < len(rf.logs) && index > 0 && rf.logs[index].Term != prevLogTermFromLeader {
 				index -= 1
 			}
 

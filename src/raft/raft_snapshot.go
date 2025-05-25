@@ -31,29 +31,29 @@ type InstallSnapShotReply struct {
 // all info up to and including index. this means the
 // service no longer needs the log through (and including)
 // that index. Raft should now trim its log as much as possible.
-func (rf *Raft) Snapshot(absoluteIndex int, snapshot []byte) {
+func (rf *Raft) Snapshot(virtualIndex int, snapshot []byte) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	Debug(dSnap, "Server %d receive snapshot request for absoluteIndex %d", rf.me, absoluteIndex)
+	Debug(dSnap, "Server %d receive snapshot request for absoluteIndex %d", rf.me, virtualIndex)
 
 	// Index will be the absolute index assume the log is not truncated
-	// actualIndex represent the actual log index in the current truncated rf.logs
-	actualIndex := absoluteIndex - rf.snapshotState.LastIncludedIndex - 1
+	// realIndex represent the actual log index in the current truncated rf.logs
+	realIndex := rf.getRealIndex(virtualIndex)
 	// Your code here (3D).
 	// Don't truncate log if there are not enough logs yet
-	if len(rf.logs) < 10 || actualIndex >= len(rf.logs) {
+	if len(rf.logs) < 10 || realIndex >= len(rf.logs) {
 		Debug(dSnap, "Server %d doesn't have enough logs, current log size %d", rf.me, len(rf.logs))
 		return
 	}
 
-	newLastIncludedTerm := rf.logs[actualIndex].Term
+	newLastIncludedTerm := rf.logs[realIndex].Term
 
 	// truncate log and write snapshot to persister
-	Debug(dSnap, "Server %d truncate logs with log size %d, truncate through index %d", rf.me, len(rf.logs), actualIndex)
+	Debug(dSnap, "Server %d truncate logs with log size %d, truncate through index %d", rf.me, len(rf.logs), realIndex)
 
-	newLogs := append([]LogEntry{}, rf.logs[actualIndex+1:]...)
-	rf.snapshotState = &SnapshotState{absoluteIndex, newLastIncludedTerm}
+	newLogs := append([]LogEntry{}, rf.logs[realIndex+1:]...)
+	rf.snapshotState = &SnapshotState{virtualIndex, newLastIncludedTerm}
 	rf.logs = newLogs
 
 	w := new(bytes.Buffer)
@@ -64,7 +64,7 @@ func (rf *Raft) Snapshot(absoluteIndex int, snapshot []byte) {
 	raftstate := w.Bytes()
 
 	rf.persister.Save(raftstate, snapshot)
-	Debug(dSnap, "Server %d truncate through absolute index %d, snapshotstate: %v, server now has %d logs", rf.me, actualIndex, rf.snapshotState, len(newLogs))
+	Debug(dSnap, "Server %d truncate through absolute index %d, snapshotstate: %v, server now has %d logs", rf.me, realIndex, rf.snapshotState, len(newLogs))
 }
 
 func (rf *Raft) installSnapshot(server int) {
